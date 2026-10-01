@@ -183,10 +183,10 @@ fn visit_largest_files(
     } else if node.kind == crate::tree::NodeKind::File {
         if heap.len() < limit {
             heap.push(std::cmp::Reverse((node.bytes, crumbs.clone())));
-        } else if let Some(mut top) = heap.peek_mut() {
-            if node.bytes > top.0.0 {
-                *top = std::cmp::Reverse((node.bytes, crumbs.clone()));
-            }
+        } else if let Some(mut top) = heap.peek_mut()
+            && node.bytes > top.0.0
+        {
+            *top = std::cmp::Reverse((node.bytes, crumbs.clone()));
         }
     }
 }
