@@ -1406,7 +1406,7 @@ fn list_section(
 
     let tab_btn = |title: &'static str, active: bool, target: SideListTab| {
         div()
-            .id(ElementId::Name(format!("tab-{}", title).into()))
+            .id(ElementId::Name(format!("tab-{title}").into()))
             .px(space::XS)
             .py(space::XXS)
             .text_size(text::CAPTION)
