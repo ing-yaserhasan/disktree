@@ -1453,25 +1453,23 @@ fn list_section(
             )
         });
 
-    let mut section = div().flex().flex_col().gap(space::XS).child(header);
+    let section = div().flex().flex_col().gap(space::XS).child(header);
 
     if is_worth {
-        render_worth_items(&mut section, app, theme, cx);
+        render_worth_items(section, app, theme, cx)
     } else {
-        render_largest_files_items(&mut section, app, theme, cx);
+        render_largest_files_items(section, app, theme, cx)
     }
-
-    section
 }
 
 fn render_worth_items(
-    section: &mut Div,
+    mut section: Div,
     app: &Disktree,
     theme: &Theme,
     cx: &Context<'_, Disktree>,
-) {
+) -> Div {
     if app.insights.is_empty() {
-        *section = std::mem::take(section).child(
+        return section.child(
             div()
                 .text_size(text::CAPTION)
                 .text_color(theme.secondary)
@@ -1481,7 +1479,6 @@ fn render_worth_items(
                     "Waiting for the scan"
                 }),
         );
-        return;
     }
     let largest = app.insights.first().map_or(1, |c| c.bytes);
     let selected = app.action_target();
@@ -1493,7 +1490,7 @@ fn render_worth_items(
         let accent = palette::category_accent(theme, node.category);
         let active = selected.as_deref() == Some(candidate.crumbs.as_slice());
         let crumbs = candidate.crumbs.clone();
-        *section = std::mem::take(section).child(
+        section = section.child(
             div()
                 .id(ElementId::Name(format!("insight-{index}").into()))
                 .flex()
@@ -1556,16 +1553,17 @@ fn render_worth_items(
                 ),
         );
     }
+    section
 }
 
 fn render_largest_files_items(
-    section: &mut Div,
+    mut section: Div,
     app: &Disktree,
     theme: &Theme,
     cx: &Context<'_, Disktree>,
-) {
+) -> Div {
     if app.top_files.is_empty() {
-        *section = std::mem::take(section).child(
+        return section.child(
             div()
                 .text_size(text::CAPTION)
                 .text_color(theme.secondary)
@@ -1575,7 +1573,6 @@ fn render_largest_files_items(
                     "Waiting for the scan"
                 }),
         );
-        return;
     }
     let largest = app.top_files.first().map_or(1, |file| file.bytes);
     let selected = app.action_target();
@@ -1602,7 +1599,7 @@ fn render_largest_files_items(
                 String::new()
             }
         });
-        *section = std::mem::take(section).child(
+        section = section.child(
             div()
                 .id(ElementId::Name(format!("top-file-{index}").into()))
                 .flex()
@@ -1669,6 +1666,7 @@ fn render_largest_files_items(
                 ),
         );
     }
+    section
 }
 
 /// A finding's title, as the last two parts of its path, and why it is on
