@@ -1420,9 +1420,7 @@ fn list_section(
             } else {
                 theme.secondary.opacity(0.7)
             })
-            .when(active, |this| {
-                this.border_b_2().border_color(theme.accent)
-            })
+            .when(active, |this| this.border_b_2().border_color(theme.accent))
             .hover(|style| style.text_color(theme.bright))
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.side_tab = target;

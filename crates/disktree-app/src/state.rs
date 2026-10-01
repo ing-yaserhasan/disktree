@@ -764,9 +764,10 @@ impl Disktree {
         self.insights = self.tree.as_deref().map_or_else(Vec::new, |tree| {
             worth_a_look(tree, self.scanned_at, INSIGHT_LIMIT)
         });
-        self.top_files = self.tree.as_deref().map_or_else(Vec::new, |tree| {
-            largest_files(tree, TOP_FILES_LIMIT)
-        });
+        self.top_files = self
+            .tree
+            .as_deref()
+            .map_or_else(Vec::new, |tree| largest_files(tree, TOP_FILES_LIMIT));
     }
 
     /// Ask git about `path` once, off the UI thread, if it is a checkout.

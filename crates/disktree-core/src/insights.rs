@@ -142,8 +142,7 @@ pub fn largest_files(root: &Node, limit: usize) -> Vec<LargestFile> {
     if limit == 0 {
         return Vec::new();
     }
-    let mut heap =
-        std::collections::BinaryHeap::with_capacity(limit);
+    let mut heap = std::collections::BinaryHeap::with_capacity(limit);
     let mut crumbs = Vec::new();
     for (index, child) in root.children.iter().enumerate() {
         crumbs.push(index);
@@ -152,9 +151,7 @@ pub fn largest_files(root: &Node, limit: usize) -> Vec<LargestFile> {
     }
     let mut files: Vec<LargestFile> = heap
         .into_iter()
-        .map(|std::cmp::Reverse((bytes, crumbs))| {
-            LargestFile { crumbs, bytes }
-        })
+        .map(|std::cmp::Reverse((bytes, crumbs))| LargestFile { crumbs, bytes })
         .collect();
     files.sort_by_key(|candidate| std::cmp::Reverse(candidate.bytes));
     files
@@ -349,4 +346,3 @@ mod tests {
         assert!(largest_files(&empty, 5).is_empty());
     }
 }
-
