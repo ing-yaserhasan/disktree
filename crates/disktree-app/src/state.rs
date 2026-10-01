@@ -12,7 +12,9 @@ use std::time::{Duration, Instant};
 
 use disktree_core::access::file_table_readable;
 use disktree_core::filter::{Keep, Matches, filter};
-use disktree_core::insights::{Candidate, worth_a_look};
+use disktree_core::insights::{
+    Candidate, LargestFile, largest_files, worth_a_look,
+};
 use disktree_core::removal::{
     Plan, RemovalEvent, RemovalHandle, RemovalMode, Target, TrashBackend,
     detect_trash_backend, plan,
@@ -101,6 +103,19 @@ pub fn panel_width(pointer_x: f32, viewport: f32, rem: f32) -> f32 {
 
 /// How many "worth a look" findings the panel lists.
 const INSIGHT_LIMIT: usize = 6;
+
+/// How many largest files the panel lists.
+const TOP_FILES_LIMIT: usize = 10;
+
+/// Which list the side panel displays above the marked list.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SideListTab {
+    /// The biggest things worth clearing (reclaimable caches, worktrees, etc.).
+    #[default]
+    Worth,
+    /// The largest individual files.
+    Files,
+}
 
 /// Which screen the app is showing.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -406,8 +421,12 @@ pub struct Disktree {
     pub crumb_menu: Option<CrumbMenu>,
 
     pub color_mode: ColorMode,
+    /// Which list tab is active in the side panel.
+    pub side_tab: SideListTab,
     /// The largest things worth clearing, recomputed when a scan lands.
     pub insights: Vec<Candidate>,
+    /// The largest individual files, recomputed when a scan lands.
+    pub top_files: Vec<LargestFile>,
     /// What git knows about each checkout that has been selected; `None`
     /// once asked and found not to be one.
     pub git: FxHashMap<PathBuf, Option<GitState>>,
@@ -518,7 +537,9 @@ impl Disktree {
             focus: cx.focus_handle(),
             crumb_menu: None,
             color_mode: ColorMode::Kind,
+            side_tab: SideListTab::Worth,
             insights: Vec::new(),
+            top_files: Vec::new(),
             git: FxHashMap::default(),
             git_pending: FxHashSet::default(),
             device: None,
@@ -737,11 +758,14 @@ impl Disktree {
         }
     }
 
-    /// Recompute "worth a look" from the tree on screen.
+    /// Recompute "worth a look" and largest files from the tree on screen.
     fn refresh_insights(&mut self) {
         self.scanned_at = now_seconds();
         self.insights = self.tree.as_deref().map_or_else(Vec::new, |tree| {
             worth_a_look(tree, self.scanned_at, INSIGHT_LIMIT)
+        });
+        self.top_files = self.tree.as_deref().map_or_else(Vec::new, |tree| {
+            largest_files(tree, TOP_FILES_LIMIT)
         });
     }
 
@@ -2608,6 +2632,13 @@ impl Disktree {
             "t" if !control => {
                 self.set_mode((self.mode_index() + 1) % 3, cx);
             }
+            "f" if !control => {
+                self.side_tab = match self.side_tab {
+                    SideListTab::Worth => SideListTab::Files,
+                    SideListTab::Files => SideListTab::Worth,
+                };
+                cx.notify();
+            }
             "r" if !control => self.start_scan(cx),
             "g" if !control => self.go_to_disk(cx),
             "v" if !control && !shift => self.open_volumes(cx),
@@ -3042,7 +3073,7 @@ impl Render for Disktree {
         // The titlebar names the directory on screen, however it got there:
         // a key, a click, a rescan or a folder chosen from the menu.
         let title = format!(
-            "disktree · {}",
+            "disktree (Yaser Edition) · {}",
             crate::marks::display_path(
                 &self.current_path(),
                 self.home.as_deref()

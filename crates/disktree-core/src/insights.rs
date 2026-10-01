@@ -128,6 +128,72 @@ fn visit(
     }
 }
 
+/// One entry in the largest files list.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LargestFile {
+    /// Where it is, from the scanned root.
+    pub crumbs: Vec<usize>,
+    /// Its size in bytes.
+    pub bytes: u64,
+}
+
+/// The `limit` largest files beneath `root`, largest first.
+pub fn largest_files(root: &Node, limit: usize) -> Vec<LargestFile> {
+    if limit == 0 {
+        return Vec::new();
+    }
+    let mut heap =
+        std::collections::BinaryHeap::with_capacity(limit);
+    let mut crumbs = Vec::new();
+    for (index, child) in root.children.iter().enumerate() {
+        crumbs.push(index);
+        visit_largest_files(child, &mut crumbs, limit, &mut heap);
+        crumbs.pop();
+    }
+    let mut files: Vec<LargestFile> = heap
+        .into_iter()
+        .map(|std::cmp::Reverse((bytes, crumbs))| {
+            LargestFile { crumbs, bytes }
+        })
+        .collect();
+    files.sort_by_key(|candidate| std::cmp::Reverse(candidate.bytes));
+    files
+}
+
+fn visit_largest_files(
+    node: &Node,
+    crumbs: &mut Vec<usize>,
+    limit: usize,
+    heap: &mut std::collections::BinaryHeap<
+        std::cmp::Reverse<(u64, Vec<usize>)>,
+    >,
+) {
+    if node.is_dir() {
+        // Pruning: if we already have `limit` files and this directory's total
+        // bytes is no larger than the smallest file in our heap, no file
+        // within this subtree can displace anything in the top `limit`.
+        if heap.len() == limit
+            && let Some(&std::cmp::Reverse((min_bytes, _))) = heap.peek()
+            && node.bytes <= min_bytes
+        {
+            return;
+        }
+        for (index, child) in node.children.iter().enumerate() {
+            crumbs.push(index);
+            visit_largest_files(child, crumbs, limit, heap);
+            crumbs.pop();
+        }
+    } else if node.kind == crate::tree::NodeKind::File {
+        if heap.len() < limit {
+            heap.push(std::cmp::Reverse((node.bytes, crumbs.clone())));
+        } else if let Some(mut top) = heap.peek_mut() {
+            if node.bytes > top.0.0 {
+                *top = std::cmp::Reverse((node.bytes, crumbs.clone()));
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,4 +308,45 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn largest_files_ranks_by_size_descending() {
+        let root = home();
+        let top = largest_files(&root, 3);
+        assert_eq!(top.len(), 3);
+        assert_eq!(top[0].bytes, 9 * GIB);
+        assert_eq!(top[1].bytes, 5 * GIB);
+        assert_eq!(top[2].bytes, 4 * GIB);
+
+        let node0 = root.resolve(&top[0].crumbs).expect("resolves");
+        assert_eq!(&*node0.name, "tax.pdf");
+        assert_eq!(node0.kind, NodeKind::File);
+
+        let node1 = root.resolve(&top[1].crumbs).expect("resolves");
+        assert_eq!(&*node1.name, "blob");
+        assert_eq!(node1.kind, NodeKind::File);
+
+        let node2 = root.resolve(&top[2].crumbs).expect("resolves");
+        assert_eq!(&*node2.name, "z");
+        assert_eq!(node2.kind, NodeKind::File);
+    }
+
+    #[test]
+    fn largest_files_skips_directories() {
+        let root = home();
+        let top = largest_files(&root, 10);
+        for item in &top {
+            let node = root.resolve(&item.crumbs).expect("resolves");
+            assert_eq!(node.kind, NodeKind::File);
+        }
+    }
+
+    #[test]
+    fn largest_files_handles_zero_limit_and_empty_root() {
+        let root = home();
+        assert!(largest_files(&root, 0).is_empty());
+        let empty = dir("empty", Vec::new());
+        assert!(largest_files(&empty, 5).is_empty());
+    }
 }
+

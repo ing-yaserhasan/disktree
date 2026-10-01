@@ -27,7 +27,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 
 use crate::palette;
 use crate::state::{
-    ColorMode, Crumb, Disktree, PANEL_REMS, Screen, panel_width,
+    ColorMode, Crumb, Disktree, PANEL_REMS, Screen, SideListTab, panel_width,
 };
 use crate::treemap_view::{self, Mosaic};
 use crate::ui::{icon, size, space, text};
@@ -1141,7 +1141,7 @@ fn side_panel(
                 .flex_1()
                 .min_h_0()
                 .overflow_y_scroll()
-                .child(worth_section(app, theme, cx))
+                .child(list_section(app, theme, cx))
                 .child(rule())
                 .child(marked_section(app, theme, cx)),
         )
@@ -1389,34 +1389,91 @@ fn selection_section(
         .child(actions)
 }
 
-/// The biggest things that could plausibly go, with their total.
-fn worth_section(
+/// The side panel list above marked items: switches between "Worth a look"
+/// findings and "Largest files".
+fn list_section(
     app: &Disktree,
     theme: &Theme,
     cx: &Context<'_, Disktree>,
 ) -> Div {
-    let total: u64 = app.insights.iter().map(|candidate| candidate.bytes).sum();
-    let largest = app.insights.first().map_or(1, |candidate| candidate.bytes);
     let highlight = palette::highlight(theme);
-    let mut section = div().flex().flex_col().gap(space::XS).child(
+    let is_worth = app.side_tab == SideListTab::Worth;
+    let total: u64 = if is_worth {
+        app.insights.iter().map(|candidate| candidate.bytes).sum()
+    } else {
+        app.top_files.iter().map(|file| file.bytes).sum()
+    };
+
+    let tab_btn = |title: &'static str, active: bool, target: SideListTab| {
         div()
-            .flex()
-            .flex_row()
-            .items_center()
-            .justify_between()
-            .pb(space::XS)
-            .child(widgets::eyebrow("Worth a look", cx))
-            .when(total > 0, |this| {
-                this.child(
-                    div()
-                        .text_size(text::CAPTION)
-                        .text_color(highlight)
-                        .child(human_bytes(total)),
-                )
-            }),
-    );
+            .id(ElementId::Name(format!("tab-{}", title).into()))
+            .px(space::XS)
+            .py(space::XXS)
+            .text_size(text::CAPTION)
+            .font_weight(if active {
+                FontWeight::SEMIBOLD
+            } else {
+                FontWeight::NORMAL
+            })
+            .text_color(if active {
+                theme.bright
+            } else {
+                theme.secondary.opacity(0.7)
+            })
+            .when(active, |this| {
+                this.border_b_2().border_color(theme.accent)
+            })
+            .hover(|style| style.text_color(theme.bright))
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.side_tab = target;
+                cx.notify();
+            }))
+            .child(title)
+    };
+
+    let header = div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .justify_between()
+        .pb(space::XS)
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(space::SM)
+                .child(tab_btn("Worth a look", is_worth, SideListTab::Worth))
+                .child(tab_btn("Largest files", !is_worth, SideListTab::Files)),
+        )
+        .when(total > 0, |this| {
+            this.child(
+                div()
+                    .text_size(text::CAPTION)
+                    .text_color(highlight)
+                    .child(human_bytes(total)),
+            )
+        });
+
+    let mut section = div().flex().flex_col().gap(space::XS).child(header);
+
+    if is_worth {
+        render_worth_items(&mut section, app, theme, cx);
+    } else {
+        render_largest_files_items(&mut section, app, theme, cx);
+    }
+
+    section
+}
+
+fn render_worth_items(
+    section: &mut Div,
+    app: &Disktree,
+    theme: &Theme,
+    cx: &Context<'_, Disktree>,
+) {
     if app.insights.is_empty() {
-        return section.child(
+        *section = std::mem::take(section).child(
             div()
                 .text_size(text::CAPTION)
                 .text_color(theme.secondary)
@@ -1426,7 +1483,9 @@ fn worth_section(
                     "Waiting for the scan"
                 }),
         );
+        return;
     }
+    let largest = app.insights.first().map_or(1, |c| c.bytes);
     let selected = app.action_target();
     for (index, candidate) in app.insights.iter().enumerate() {
         let Some(node) = app.node_at(&candidate.crumbs) else {
@@ -1436,7 +1495,7 @@ fn worth_section(
         let accent = palette::category_accent(theme, node.category);
         let active = selected.as_deref() == Some(candidate.crumbs.as_slice());
         let crumbs = candidate.crumbs.clone();
-        section = section.child(
+        *section = std::mem::take(section).child(
             div()
                 .id(ElementId::Name(format!("insight-{index}").into()))
                 .flex()
@@ -1499,7 +1558,119 @@ fn worth_section(
                 ),
         );
     }
-    section
+}
+
+fn render_largest_files_items(
+    section: &mut Div,
+    app: &Disktree,
+    theme: &Theme,
+    cx: &Context<'_, Disktree>,
+) {
+    if app.top_files.is_empty() {
+        *section = std::mem::take(section).child(
+            div()
+                .text_size(text::CAPTION)
+                .text_color(theme.secondary)
+                .child(if app.tree().is_some() {
+                    "No files found"
+                } else {
+                    "Waiting for the scan"
+                }),
+        );
+        return;
+    }
+    let largest = app.top_files.first().map_or(1, |file| file.bytes);
+    let selected = app.action_target();
+    let tree = app.tree();
+    for (index, file) in app.top_files.iter().enumerate() {
+        let Some(node) = app.node_at(&file.crumbs) else {
+            continue;
+        };
+        let accent = palette::category_accent(theme, node.category);
+        let active = selected.as_deref() == Some(file.crumbs.as_slice());
+        let crumbs = file.crumbs.clone();
+        let detail = tree.map_or_else(String::new, |t| {
+            let chain = t.resolve_chain(&file.crumbs);
+            if chain.len() > 2 {
+                let parts: Vec<&str> = chain
+                    .iter()
+                    .skip(1)
+                    .take(chain.len().saturating_sub(2))
+                    .map(|n| &*n.name)
+                    .collect();
+                let start = parts.len().saturating_sub(2);
+                parts[start..].join("/")
+            } else {
+                String::new()
+            }
+        });
+        *section = std::mem::take(section).child(
+            div()
+                .id(ElementId::Name(format!("top-file-{index}").into()))
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(space::SM)
+                .px(space::SM)
+                .py(space::XS)
+                .when(active, |this| this.bg(theme.hover_fill()))
+                .hover(|style| style.bg(theme.hover_fill()))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.reveal(crumbs.clone(), cx);
+                    window.focus(&this.focus, cx);
+                }))
+                .child(div().flex_shrink_0().w(px(2.)).h(space::XL).bg(accent))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .min_w_0()
+                        .child(
+                            div()
+                                .text_size(text::BODY)
+                                .text_color(theme.bright)
+                                .whitespace_nowrap()
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .child(node.name.to_string()),
+                        )
+                        .child(
+                            div()
+                                .text_size(text::CAPTION)
+                                .text_color(theme.secondary.opacity(0.8))
+                                .whitespace_nowrap()
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .child(if detail.is_empty() {
+                                    node.category.label().to_string()
+                                } else {
+                                    detail
+                                }),
+                        ),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .items_end()
+                        .gap(space::XS)
+                        .flex_shrink_0()
+                        .w(size::ROW_BAR)
+                        .child(
+                            div()
+                                .text_size(text::BODY)
+                                .text_color(theme.bright)
+                                .child(human_bytes(file.bytes)),
+                        )
+                        .child(widgets::bar(
+                            file.bytes as f32 / largest.max(1) as f32,
+                            accent,
+                            cx,
+                        )),
+                ),
+        );
+    }
 }
 
 /// A finding's title, as the last two parts of its path, and why it is on
@@ -2049,6 +2220,15 @@ fn key_bar(app: &Disktree, theme: &Theme, cx: &App) -> Div {
                 .text_size(text::CAPTION)
                 .text_color(theme.secondary.opacity(0.7))
                 .child(scan),
+        )
+        .child(
+            div()
+                .flex_shrink_0()
+                .px(space::XS)
+                .text_size(text::CAPTION)
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(theme.accent)
+                .child("Yaser Edition"),
         )
 }
 
@@ -3284,6 +3464,7 @@ fn help_overlay(app: &Disktree, cx: &gpui_kit::App) -> Div {
         ),
         ("c", "Review the marked list"),
         ("t", "Size, files or age: what areas and colours say"),
+        ("f", "Switch between Worth a look and Largest files"),
         ("r", "Scan again from the same root"),
         ("esc", "Stop a scan in progress"),
         ("v", "Scan another volume"),

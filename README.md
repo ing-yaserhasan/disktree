@@ -151,7 +151,8 @@ disktree --help     # options: apparent size, follow links, skip hidden, …
   the last write instead, from this week to older.
 - **Panel:** the selection (its size set large, share of the scan, files,
   last write, and for a checkout what git says — changes, stashes, unpushed
-  commits); *Worth a look*, the largest things that could plausibly go;
+  commits); *Worth a look* and *Largest files* (toggle with `f` or click the
+  tabs), the biggest things that could plausibly go or giant individual files;
   what is marked; and the disk, free now and after the marks, with the way
   to the review screen. Drag its left edge to resize it; double-click the
   edge to reset.
@@ -220,6 +221,7 @@ and shows how much free space was actually gained.
 | `/` | filter by name: only matches keep their colour; `enter` shows only them, `esc` clears |
 | `c` | review the marked list |
 | `t` | rank by size or by file count |
+| `f` | toggle between worth a look and largest files |
 | `d` | disk usage or apparent size |
 | `i` | include or skip hidden entries |
 | `r` | scan again |
