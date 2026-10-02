@@ -1401,29 +1401,26 @@ fn selection_section(
                 .tab_stop(false)
                 .flex_1()
                 .justify_center()
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.unmark(&ancestor_clone, cx);
-                    window.focus(&this.focus, cx);
-                })),
+                .on_click(cx.listener(
+                    move |this, _, window, cx| {
+                        this.unmark(&ancestor_clone, cx);
+                        window.focus(&this.focus, cx);
+                    },
+                )),
             );
         } else if marked {
             let unmark_crumbs = crumbs.clone();
             let delete_crumbs = crumbs.clone();
             actions = actions
                 .child(
-                    button(
-                        "mark",
-                        "Unmark",
-                        ButtonVariant::Outline,
-                        cx,
-                    )
-                    .tab_stop(false)
-                    .flex_1()
-                    .justify_center()
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.toggle_mark(&unmark_crumbs, cx);
-                        window.focus(&this.focus, cx);
-                    })),
+                    button("mark", "Unmark", ButtonVariant::Outline, cx)
+                        .tab_stop(false)
+                        .flex_1()
+                        .justify_center()
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.toggle_mark(&unmark_crumbs, cx);
+                            window.focus(&this.focus, cx);
+                        })),
                 )
                 .child(
                     button(
@@ -1435,10 +1432,12 @@ fn selection_section(
                     .tab_stop(false)
                     .flex_1()
                     .justify_center()
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.prompt_delete(&delete_crumbs, cx);
-                        this.apply_focus(window, cx);
-                    })),
+                    .on_click(cx.listener(
+                        move |this, _, window, cx| {
+                            this.prompt_delete(&delete_crumbs, cx);
+                            this.apply_focus(window, cx);
+                        },
+                    )),
                 );
         } else {
             let delete_crumbs = crumbs.clone();
@@ -1454,25 +1453,22 @@ fn selection_section(
                     .tab_stop(false)
                     .flex_1()
                     .justify_center()
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.prompt_delete(&delete_crumbs, cx);
-                        this.apply_focus(window, cx);
-                    })),
+                    .on_click(cx.listener(
+                        move |this, _, window, cx| {
+                            this.prompt_delete(&delete_crumbs, cx);
+                            this.apply_focus(window, cx);
+                        },
+                    )),
                 )
                 .child(
-                    button(
-                        "mark",
-                        "Mark",
-                        ButtonVariant::Outline,
-                        cx,
-                    )
-                    .tab_stop(false)
-                    .flex_1()
-                    .justify_center()
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.toggle_mark(&mark_crumbs, cx);
-                        window.focus(&this.focus, cx);
-                    })),
+                    button("mark", "Mark", ButtonVariant::Outline, cx)
+                        .tab_stop(false)
+                        .flex_1()
+                        .justify_center()
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.toggle_mark(&mark_crumbs, cx);
+                            window.focus(&this.focus, cx);
+                        })),
                 );
         }
     }
@@ -2679,15 +2675,9 @@ fn find_field(
                 .flex_row()
                 .items_center()
                 .gap(space::XXS)
-                .child(
-                    div().text_color(theme.bright).child(app.find.clone()),
-                )
+                .child(div().text_color(theme.bright).child(app.find.clone()))
                 .when(is_active, |this| {
-                    this.child(
-                        div()
-                            .text_color(theme.accent)
-                            .child("|"),
-                    )
+                    this.child(div().text_color(theme.accent).child("|"))
                 })
         })
         .when(!summary.is_empty(), |this| {
