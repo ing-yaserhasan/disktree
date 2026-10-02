@@ -61,6 +61,13 @@ pub struct CrumbMenu {
     pub highlighted: usize,
 }
 
+/// Position and target of an open treemap right-click context menu.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ContextMenuState {
+    pub position: Point<Pixels>,
+    pub crumbs: Vec<usize>,
+}
+
 /// One row of a sibling menu.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Sibling {
@@ -419,6 +426,8 @@ pub struct Disktree {
     pub focus: FocusHandle,
     /// A trail crumb's sibling menu, when open.
     pub crumb_menu: Option<CrumbMenu>,
+    /// Active right-click context menu on the treemap.
+    pub context_menu: Option<ContextMenuState>,
 
     pub color_mode: ColorMode,
     /// Which list tab is active in the side panel.
@@ -536,6 +545,7 @@ impl Disktree {
             show_selection: true,
             focus: cx.focus_handle(),
             crumb_menu: None,
+            context_menu: None,
             color_mode: ColorMode::Kind,
             side_tab: SideListTab::Worth,
             insights: Vec::new(),
@@ -678,7 +688,6 @@ impl Disktree {
                     space: space_info(&root).ok(),
                 });
             }
-            volumes.retain(|volume| volume.point != root_path);
             volumes
         });
         cx.spawn(async move |this, cx| {
@@ -1035,7 +1044,10 @@ impl Disktree {
                 break;
             };
             crumbs.push(index);
-            trail.push((node.name.to_string(), Crumb::Tree(crumbs.clone())));
+            trail.push((
+                crate::bidi::fix_rtl(&node.name).into_owned(),
+                Crumb::Tree(crumbs.clone()),
+            ));
         }
         trail
     }
@@ -2471,6 +2483,15 @@ impl Disktree {
             return;
         }
 
+        if self.context_menu.is_some() {
+            if key == "escape" {
+                self.context_menu = None;
+                cx.notify();
+                return;
+            }
+            self.context_menu = None;
+        }
+
         if self.crumb_menu.is_some() && self.on_menu_key(key, cx) {
             return;
         }
@@ -2755,9 +2776,19 @@ impl Disktree {
         let x = (event.position.x - origin.x).as_f32();
         let y = (event.position.y - origin.y).as_f32();
         let crumbs = self.tile_at(x, y);
-
         match event.button {
+            MouseButton::Right => {
+                if let Some(crumbs) = crumbs {
+                    self.select(Some(crumbs.clone()), cx);
+                    self.context_menu = Some(ContextMenuState {
+                        position: event.position,
+                        crumbs,
+                    });
+                    cx.notify();
+                }
+            }
             MouseButton::Left if event.click_count >= 2 => {
+                self.context_menu = None;
                 if let Some(crumbs) = crumbs {
                     self.select(Some(crumbs), cx);
                     self.descend(cx);
@@ -2766,11 +2797,13 @@ impl Disktree {
             MouseButton::Left
                 if event.modifiers.control || event.modifiers.platform =>
             {
+                self.context_menu = None;
                 if let Some(crumbs) = crumbs {
                     self.toggle_mark(&crumbs, cx);
                 }
             }
             MouseButton::Left => {
+                self.context_menu = None;
                 let activate = crumbs.as_ref().is_some_and(|crumbs| {
                     self.selected.as_ref() == Some(crumbs)
                         && self.node_at(crumbs).is_some_and(Node::is_dir)
@@ -2784,6 +2817,7 @@ impl Disktree {
                 self.select(crumbs, cx);
             }
             MouseButton::Middle => {
+                self.context_menu = None;
                 if let Some(crumbs) = crumbs {
                     self.toggle_mark(&crumbs, cx);
                 }

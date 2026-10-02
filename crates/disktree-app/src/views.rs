@@ -117,6 +117,9 @@ pub fn root(
     if app.confirm_open {
         root = root.child(delete_dialog(app, cx));
     }
+    if let Some(menu) = context_menu(app, window, cx) {
+        root = root.child(menu);
+    }
     root
 }
 
@@ -146,12 +149,14 @@ fn volumes_dialog(
             || "unknown free".to_string(),
             |space| format!("{} free", human_bytes(space.available)),
         );
+        let is_current = volume.point == app.root_path;
+        let suffix = if is_current { " \u{00b7} current" } else { "" };
         let label = match &volume.device {
             Some(device) => format!(
-                "{}  \u{00b7}  {device}  \u{00b7}  {free}",
+                "{} \u{00b7} {device} \u{00b7} {free}{suffix}",
                 volume.point.display()
             ),
-            None => format!("{}  \u{00b7}  {free}", volume.point.display()),
+            None => format!("{} \u{00b7} {free}{suffix}", volume.point.display()),
         };
         rows = rows.child(
             div()
@@ -460,6 +465,14 @@ fn top_bar(
         .child(logo(theme))
         // Where you are is navigation, and it belongs to the whole window.
         .child(trail(app, theme, cx))
+        .child(
+            button("drives-btn", "Drives (V)", ButtonVariant::Secondary, cx)
+                .tab_stop(false)
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.open_volumes(cx);
+                    this.apply_focus(window, cx);
+                })),
+        )
         .child(div().flex_1())
         .child(view_settings(app, window, cx))
 }
@@ -635,7 +648,7 @@ fn sibling_menu(
         if parent.is_empty() {
             crate::marks::display_path(&app.root_path, app.home.as_deref())
         } else {
-            node.name.to_string()
+            crate::bidi::fix_rtl(&node.name).into_owned()
         }
     });
     let metric = app.options.metric;
@@ -1206,7 +1219,7 @@ fn selection_section(
                         .whitespace_nowrap()
                         .overflow_hidden()
                         .text_ellipsis()
-                        .child(node.name.to_string()),
+                        .child(crate::bidi::fix_rtl(&node.name).into_owned()),
                 ),
         )
         .child(
@@ -1628,7 +1641,10 @@ fn render_largest_files_items(
                                 .whitespace_nowrap()
                                 .overflow_hidden()
                                 .text_ellipsis()
-                                .child(node.name.to_string()),
+                                .child(
+                                    crate::bidi::fix_rtl(&node.name)
+                                        .into_owned(),
+                                ),
                         )
                         .child(
                             div()
@@ -3335,7 +3351,7 @@ fn node_card(
                         .min_w_0()
                         .font_weight(FontWeight::SEMIBOLD)
                         .text_color(theme.bright)
-                        .child(node.name.to_string()),
+                        .child(crate::bidi::fix_rtl(&node.name).into_owned()),
                 ),
         )
         .child(
@@ -3566,5 +3582,197 @@ fn help_overlay(app: &Disktree, cx: &gpui_kit::App) -> Div {
                             app.options.metric.label()
                         )),
                 ),
+        )
+}
+
+/// A context menu opened by right-clicking a tile in the treemap.
+fn context_menu(
+    app: &Disktree,
+    window: &Window,
+    cx: &mut Context<'_, Disktree>,
+) -> Option<impl IntoElement> {
+    let menu = app.context_menu.as_ref()?;
+    let crumbs = &menu.crumbs;
+    let node = app.node_at(crumbs)?;
+    let theme = cx.omarchy().clone();
+    let is_dir = node.is_dir();
+    let path = app.path_at(crumbs);
+    let is_marked =
+        path.as_deref().is_some_and(|path| app.marks.contains(path));
+
+    let rem = window.rem_size().as_f32();
+    let width = 16.0 * rem;
+    let estimated_height = (if is_dir { 8.5 } else { 7.0 }) * rem;
+    let window_size = window.bounds().size;
+
+    let x = if menu.position.x.as_f32() + width
+        > window_size.width.as_f32() - 8.0
+    {
+        (menu.position.x.as_f32() - width).max(8.0)
+    } else {
+        menu.position.x.as_f32()
+    };
+    let y = if menu.position.y.as_f32() + estimated_height
+        > window_size.height.as_f32() - 8.0
+    {
+        (menu.position.y.as_f32() - estimated_height).max(8.0)
+    } else {
+        menu.position.y.as_f32()
+    };
+
+    let target_crumbs = crumbs.clone();
+    let display_name = crate::bidi::fix_rtl(&node.name).into_owned();
+
+    let mut panel = div()
+        .id("context-menu-panel")
+        .debug_selector(|| "context-menu-panel".into())
+        .occlude()
+        .flex()
+        .flex_col()
+        .gap(space::XXS)
+        .w(px(width))
+        .p(space::XXS)
+        .bg(theme.surface)
+        .border_1()
+        .border_color(theme.control_border())
+        .shadow_lg()
+        .on_mouse_down_out(cx.listener(|this, _, _, cx| {
+            this.context_menu = None;
+            cx.notify();
+        }))
+        .child(
+            div()
+                .px(space::XS)
+                .py(space::XXS)
+                .font_weight(FontWeight::BOLD)
+                .text_color(theme.bright)
+                .text_size(text::CAPTION)
+                .child(display_name),
+        );
+
+    panel = panel.child(context_menu_item(
+        "cm-open-explorer",
+        "Open in File Explorer",
+        "O",
+        gpui_omarchy::IconName::FolderOpen,
+        &theme,
+        cx.listener(|this, _, _, cx| {
+            this.context_menu = None;
+            this.reveal_target(cx);
+        }),
+    ));
+
+    if is_dir {
+        panel = panel.child(context_menu_item(
+            "cm-open-dir",
+            "Open Directory",
+            "Enter",
+            gpui_omarchy::IconName::FolderOpen,
+            &theme,
+            cx.listener(|this, _, _, cx| {
+                this.context_menu = None;
+                this.descend(cx);
+            }),
+        ));
+    }
+
+    let mark_crumbs = target_crumbs.clone();
+    let mark_label = if is_marked {
+        "Unmark"
+    } else {
+        "Mark for Removal"
+    };
+    panel = panel.child(context_menu_item(
+        "cm-mark",
+        mark_label,
+        "Space",
+        gpui_omarchy::IconName::Check,
+        &theme,
+        cx.listener(move |this, _, _, cx| {
+            this.context_menu = None;
+            this.toggle_mark(&mark_crumbs, cx);
+        }),
+    ));
+
+    if let Some(p) = path {
+        let path_str = p.to_string_lossy().to_string();
+        panel = panel.child(context_menu_item(
+            "cm-copy-path",
+            "Copy Path",
+            "Ctrl+C",
+            gpui_omarchy::IconName::File,
+            &theme,
+            cx.listener(move |this, _, _, cx| {
+                this.context_menu = None;
+                cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(
+                    path_str.clone(),
+                ));
+                this.notice = Some((
+                    "Path copied to clipboard".into(),
+                    crate::state::Status::Notice,
+                ));
+                cx.notify();
+            }),
+        ));
+    }
+
+    panel = panel.child(context_menu_item(
+        "cm-switch-volume",
+        "Switch Drive",
+        "V",
+        gpui_omarchy::IconName::Search,
+        &theme,
+        cx.listener(|this, _, _, cx| {
+            this.context_menu = None;
+            this.open_volumes(cx);
+        }),
+    ));
+
+    Some(div().absolute().left(px(x)).top(px(y)).child(panel))
+}
+
+fn context_menu_item(
+    id: &'static str,
+    label: &'static str,
+    key_hint: &'static str,
+    icon: gpui_omarchy::IconName,
+    theme: &gpui_omarchy::Theme,
+    on_click: impl Fn(
+        &mut Disktree,
+        &ClickEvent,
+        &mut Window,
+        &mut Context<'_, Disktree>,
+    ) + 'static,
+) -> Stateful<Div> {
+    div()
+        .id(ElementId::Name(id.into()))
+        .flex()
+        .flex_row()
+        .items_center()
+        .justify_between()
+        .px(space::XS)
+        .py(space::XXS)
+        .cursor_pointer()
+        .rounded_sm()
+        .hover(|style| style.bg(theme.hover_fill()))
+        .on_click(on_click)
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(space::XS)
+                .child(
+                    gpui_omarchy::icon(icon)
+                        .size(icon::SM)
+                        .text_color(theme.secondary),
+                )
+                .child(label),
+        )
+        .child(
+            div()
+                .text_color(theme.dim)
+                .text_size(text::CAPTION)
+                .child(key_hint),
         )
 }

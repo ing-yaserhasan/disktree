@@ -21,8 +21,14 @@ anyhow = { workspace = true }
 dunce = "1.0.5"
 rustc-hash = { workspace = true }
 
+arabic_reshaper = "0.4.2"
+unicode-bidi = "0.3.18"
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_System_Console"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"
 
 [dev-dependencies]
 # The window harness: it lets the tests draw a real frame and press real keys.

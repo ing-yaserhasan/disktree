@@ -439,8 +439,9 @@ fn paint_labels(
             FontWeight::NORMAL
         };
 
+        let display_text = crate::bidi::fix_rtl(&label.text);
         let run = TextRun {
-            len: label.text.len(),
+            len: display_text.len(),
             font: Font {
                 weight,
                 ..font.clone()
@@ -449,7 +450,7 @@ fn paint_labels(
             ..TextRun::default()
         };
         let line = text_system.shape_line(
-            SharedString::from(label.text.clone()),
+            SharedString::from(display_text.into_owned()),
             name_size,
             &[run],
             None,
