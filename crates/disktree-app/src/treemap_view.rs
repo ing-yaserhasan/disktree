@@ -121,8 +121,11 @@ pub fn mosaic(
                 this.on_mouse_up(event, cx);
             }),
         )
-        .when(app.is_panning(), |d| d.cursor_grabbing())
-        .when(!app.is_panning() && app.view.scale > 1.0, |d| d.cursor_grab())
+        .when(app.is_panning(), gpui_kit::Styled::cursor_grabbing)
+        .when(
+            !app.is_panning() && app.view.scale > 1.0,
+            gpui_kit::Styled::cursor_grab,
+        )
         .on_scroll_wheel(cx.listener(
             |this, event: &ScrollWheelEvent, _, cx| {
                 this.on_scroll_wheel(event, cx);
