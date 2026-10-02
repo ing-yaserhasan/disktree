@@ -3679,11 +3679,7 @@ fn context_menu(
     }
 
     let mark_crumbs = target_crumbs;
-    let mark_label = if is_marked {
-        "Unmark"
-    } else {
-        "Mark for Removal"
-    };
+    let mark_label = if is_marked { "Unmark" } else { "Delete" };
     panel = panel.child(context_menu_item(
         "cm-mark",
         mark_label,

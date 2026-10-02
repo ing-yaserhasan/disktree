@@ -15,9 +15,9 @@ use disktree_core::treemap::Rect;
 use gpui_kit::{
     App, Bounds, ContentMask, Context, Corners, Edges, Font, FontWeight, Hsla,
     InteractiveElement as _, IntoElement, MouseDownEvent, MouseMoveEvent,
-    ParentElement as _, Pixels, Point, ScrollWheelEvent, SharedString, Size,
-    StatefulInteractiveElement as _, Styled, TextAlign, TextRun, Window,
-    canvas, div, pattern_slash, px, quad,
+    MouseUpEvent, ParentElement as _, Pixels, Point, ScrollWheelEvent,
+    SharedString, Size, StatefulInteractiveElement as _, Styled, TextAlign,
+    TextRun, Window, canvas, div, pattern_slash, px, quad,
 };
 use gpui_omarchy::{ActiveTheme, Theme};
 
@@ -107,6 +107,9 @@ pub fn mosaic(
         // to be repeated for each.
         .on_any_mouse_down(cx.listener(|this, event: &MouseDownEvent, _, cx| {
             this.on_mouse_down(event, cx);
+        }))
+        .on_any_mouse_up(cx.listener(|this, event: &MouseUpEvent, _, cx| {
+            this.on_mouse_up(event, cx);
         }))
         .on_scroll_wheel(cx.listener(
             |this, event: &ScrollWheelEvent, _, cx| {

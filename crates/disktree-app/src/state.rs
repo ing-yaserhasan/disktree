@@ -29,8 +29,8 @@ use disktree_core::treemap::{
 };
 use gpui_kit::{
     Context, FocusHandle, KeyDownEvent, MouseButton, MouseDownEvent,
-    MouseMoveEvent, NavigationDirection, Pixels, Point, Render, ScrollDelta,
-    ScrollWheelEvent, Size, Window, px, size,
+    MouseMoveEvent, MouseUpEvent, NavigationDirection, Pixels, Point,
+    Render, ScrollDelta, ScrollWheelEvent, Size, Window, px, size,
 };
 use gpui_omarchy::Status;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -428,6 +428,9 @@ pub struct Disktree {
     pub crumb_menu: Option<CrumbMenu>,
     /// Active right-click context menu on the treemap.
     pub context_menu: Option<ContextMenuState>,
+    /// Drag-to-pan: where the pointer was when panning started,
+    /// and the view origin at that moment.
+    pan_start: Option<(f32, f32, f32, f32)>,
 
     pub color_mode: ColorMode,
     /// Which list tab is active in the side panel.
@@ -546,6 +549,7 @@ impl Disktree {
             focus: cx.focus_handle(),
             crumb_menu: None,
             context_menu: None,
+            pan_start: None,
             color_mode: ColorMode::Kind,
             side_tab: SideListTab::Worth,
             insights: Vec::new(),
@@ -1065,7 +1069,7 @@ impl Disktree {
             .enumerate()
             .map(|(index, child)| Sibling {
                 index,
-                name: child.name.to_string(),
+                name: crate::bidi::fix_rtl(&child.name).into_owned(),
                 value: child.value(metric),
                 category: child.category,
                 is_dir: child.is_dir(),
@@ -2731,6 +2735,21 @@ impl Disktree {
             event.position.x - origin.x,
             event.position.y - origin.y,
         );
+
+        // While a pan drag is active, move the view origin.
+        if let Some((start_x, start_y, ox, oy)) = self.pan_start {
+            let dx =
+                (local.x.as_f32() - start_x) / self.view.scale;
+            let dy =
+                (local.y.as_f32() - start_y) / self.view.scale;
+            let area = self.treemap_size.get();
+            self.view.origin_x = ox - dx;
+            self.view.origin_y = oy - dy;
+            self.view = self.view.clamped(area);
+            cx.notify();
+            return;
+        }
+
         // Moves are delivered here even when the pointer is elsewhere in the
         // window. Outside the mosaic there is nothing to hover, and a stale
         // tooltip would cover whatever the pointer went to — the panel's
@@ -2817,10 +2836,13 @@ impl Disktree {
                 self.select(crumbs, cx);
             }
             MouseButton::Middle => {
+                // Middle-click starts a pan drag.
                 self.context_menu = None;
-                if let Some(crumbs) = crumbs {
-                    self.toggle_mark(&crumbs, cx);
-                }
+                self.pan_start = Some((
+                    x, y,
+                    self.view.origin_x,
+                    self.view.origin_y,
+                ));
             }
             // Buttons 8 and 9. gpui-pre maps them on X11, Wayland and
             // Windows; a mouse with no side buttons never sends them, and
@@ -2836,6 +2858,17 @@ impl Disktree {
                 self.go_forward(cx);
             }
             MouseButton::Navigate(_) => {}
+        }
+    }
+
+    /// Release: stop panning if a middle-button drag was active.
+    pub fn on_mouse_up(
+        &mut self,
+        event: &MouseUpEvent,
+        _cx: &mut Context<'_, Self>,
+    ) {
+        if event.button == MouseButton::Middle {
+            self.pan_start = None;
         }
     }
 
@@ -2974,10 +3007,11 @@ const HEADER_INNER_REMS: f32 = 1.0;
 
 /// A trail step's label: the directory's own name, or `/` for the root.
 fn crumb_label(path: &Path) -> String {
-    path.file_name().map_or_else(
+    let raw = path.file_name().map_or_else(
         || path.display().to_string(),
         |name| name.to_string_lossy().into_owned(),
-    )
+    );
+    crate::bidi::fix_rtl(&raw).into_owned()
 }
 
 impl Disktree {
