@@ -156,7 +156,9 @@ fn volumes_dialog(
                 "{} \u{00b7} {device} \u{00b7} {free}{suffix}",
                 volume.point.display()
             ),
-            None => format!("{} \u{00b7} {free}{suffix}", volume.point.display()),
+            None => {
+                format!("{} \u{00b7} {free}{suffix}", volume.point.display())
+            }
         };
         rows = rows.child(
             div()
