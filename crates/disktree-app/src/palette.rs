@@ -130,7 +130,6 @@ pub const fn highlight(theme: &Theme) -> Hsla {
     theme.warning
 }
 
-
 /// The diagonal hatch over reclaimable space: quiet enough to leave the hue
 /// readable, visible on every fill.
 pub fn hatch(theme: &Theme) -> Hsla {
