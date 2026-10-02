@@ -29,8 +29,8 @@ use disktree_core::treemap::{
 };
 use gpui_kit::{
     Context, FocusHandle, KeyDownEvent, MouseButton, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, NavigationDirection, Pixels, Point,
-    Render, ScrollDelta, ScrollWheelEvent, Size, Window, px, size,
+    MouseMoveEvent, MouseUpEvent, NavigationDirection, Pixels, Point, Render,
+    ScrollDelta, ScrollWheelEvent, Size, Window, px, size,
 };
 use gpui_omarchy::Status;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -2738,10 +2738,8 @@ impl Disktree {
 
         // While a pan drag is active, move the view origin.
         if let Some((start_x, start_y, ox, oy)) = self.pan_start {
-            let dx =
-                (local.x.as_f32() - start_x) / self.view.scale;
-            let dy =
-                (local.y.as_f32() - start_y) / self.view.scale;
+            let dx = (local.x.as_f32() - start_x) / self.view.scale;
+            let dy = (local.y.as_f32() - start_y) / self.view.scale;
             let area = self.treemap_size.get();
             self.view.origin_x = ox - dx;
             self.view.origin_y = oy - dy;
@@ -2838,11 +2836,8 @@ impl Disktree {
             MouseButton::Middle => {
                 // Middle-click starts a pan drag.
                 self.context_menu = None;
-                self.pan_start = Some((
-                    x, y,
-                    self.view.origin_x,
-                    self.view.origin_y,
-                ));
+                self.pan_start =
+                    Some((x, y, self.view.origin_x, self.view.origin_y));
             }
             // Buttons 8 and 9. gpui-pre maps them on X11, Wayland and
             // Windows; a mouse with no side buttons never sends them, and
