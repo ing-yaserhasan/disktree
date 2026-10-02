@@ -467,14 +467,6 @@ fn top_bar(
         .child(logo(theme))
         // Where you are is navigation, and it belongs to the whole window.
         .child(trail(app, theme, cx))
-        .child(
-            button("drives-btn", "Drives (V)", ButtonVariant::Secondary, cx)
-                .tab_stop(false)
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.open_volumes(cx);
-                    this.apply_focus(window, cx);
-                })),
-        )
         .child(div().flex_1())
         .child(view_settings(app, window, cx))
 }
