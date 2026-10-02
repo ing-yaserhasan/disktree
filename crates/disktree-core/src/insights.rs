@@ -481,4 +481,3 @@ mod tests {
         assert_eq!(dupes[1].files.len(), 2);
     }
 }
-

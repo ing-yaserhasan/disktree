@@ -1419,9 +1419,7 @@ fn list_section(
         SideListTab::Worth => {
             app.insights.iter().map(|candidate| candidate.bytes).sum()
         }
-        SideListTab::Files => {
-            app.top_files.iter().map(|file| file.bytes).sum()
-        }
+        SideListTab::Files => app.top_files.iter().map(|file| file.bytes).sum(),
         SideListTab::Duplicates => {
             app.duplicate_files.iter().map(|g| g.wasted_bytes).sum()
         }
@@ -1797,11 +1795,7 @@ fn render_duplicate_items(
                         window.focus(&this.focus, cx);
                     }))
                     .child(
-                        div()
-                            .flex_shrink_0()
-                            .w(px(2.))
-                            .h(space::XL)
-                            .bg(accent),
+                        div().flex_shrink_0().w(px(2.)).h(space::XL).bg(accent),
                     )
                     .child(
                         div()

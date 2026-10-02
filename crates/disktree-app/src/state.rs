@@ -791,10 +791,8 @@ impl Disktree {
             .tree
             .as_deref()
             .map_or_else(Vec::new, |tree| largest_files(tree, TOP_FILES_LIMIT));
-        self.duplicate_files = self
-            .tree
-            .as_deref()
-            .map_or_else(Vec::new, |tree| {
+        self.duplicate_files =
+            self.tree.as_deref().map_or_else(Vec::new, |tree| {
                 duplicate_files(tree, DUPLICATES_LIMIT)
             });
     }
