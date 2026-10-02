@@ -62,7 +62,7 @@ pub struct CrumbMenu {
 }
 
 /// Position and target of an open treemap right-click context menu.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ContextMenuState {
     pub position: Point<Pixels>,
     pub crumbs: Vec<usize>,
@@ -2835,7 +2835,7 @@ impl Disktree {
             {
                 self.go_forward(cx);
             }
-            _ => {}
+            MouseButton::Navigate(_) => {}
         }
     }
 

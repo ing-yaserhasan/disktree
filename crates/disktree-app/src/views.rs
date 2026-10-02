@@ -3591,7 +3591,7 @@ fn help_overlay(app: &Disktree, cx: &gpui_kit::App) -> Div {
 fn context_menu(
     app: &Disktree,
     window: &Window,
-    cx: &mut Context<'_, Disktree>,
+    cx: &Context<'_, Disktree>,
 ) -> Option<impl IntoElement> {
     let menu = app.context_menu.as_ref()?;
     let crumbs = &menu.crumbs;
@@ -3678,7 +3678,7 @@ fn context_menu(
         ));
     }
 
-    let mark_crumbs = target_crumbs.clone();
+    let mark_crumbs = target_crumbs;
     let mark_label = if is_marked {
         "Unmark"
     } else {

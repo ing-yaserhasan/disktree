@@ -1,6 +1,6 @@
 //! Arabic reshaping and bidirectional text reordering for LTR text engines.
 //!
-//! GPUI renders glyphs left-to-right without contextual Arabic shaping or BiDi
+//! GPUI renders glyphs left-to-right without contextual Arabic shaping or `BiDi`
 //! level resolution. This module shapes Arabic characters into their connected
 //! presentation forms (Unicode Arabic Presentation Forms-B) and reverses the
 //! visual order of RTL segments so they render naturally in GPUI.
@@ -9,7 +9,7 @@ use std::borrow::Cow;
 
 /// Returns true if the character belongs to an RTL/Arabic script block.
 #[inline]
-fn is_rtl_char(c: char) -> bool {
+const fn is_rtl_char(c: char) -> bool {
     matches!(
         c,
         '\u{0590}'..='\u{05FF}'
