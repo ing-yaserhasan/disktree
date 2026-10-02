@@ -13,8 +13,8 @@ use std::time::{Duration, Instant};
 use disktree_core::access::file_table_readable;
 use disktree_core::filter::{Keep, Matches, filter};
 use disktree_core::insights::{
-    Candidate, DuplicateFile, DuplicateGroup, LargestFile, duplicate_files,
-    largest_files, worth_a_look,
+    Candidate, DuplicateGroup, LargestFile, duplicate_files, largest_files,
+    worth_a_look,
 };
 use disktree_core::removal::{
     Plan, RemovalEvent, RemovalHandle, RemovalMode, Target, TrashBackend,

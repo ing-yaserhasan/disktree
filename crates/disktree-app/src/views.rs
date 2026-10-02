@@ -1729,7 +1729,7 @@ fn render_duplicate_items(
                 .flex_row()
                 .justify_between()
                 .items_center()
-                .pt(if group_idx > 0 { space::SM } else { px(0.) })
+                .when(group_idx > 0, |this| this.pt(space::SM))
                 .pb(space::XXS)
                 .px(space::XS)
                 .child(
