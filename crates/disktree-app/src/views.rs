@@ -18,9 +18,9 @@ use gpui_kit::{
     pattern_slash, px, relative,
 };
 use gpui_omarchy::{
-    alert_dialog, button, button_group, checkbox, dialog_button,
-    dialog_description, dialog_popup, dialog_title, separator, with_tooltip,
-    ActiveTheme, ButtonVariant, ChoiceItem, Status, Theme,
+    ActiveTheme, ButtonVariant, ChoiceItem, Status, Theme, alert_dialog,
+    button, button_group, checkbox, dialog_button, dialog_description,
+    dialog_popup, dialog_title, separator, with_tooltip,
 };
 
 use gpui_kit::prelude::FluentBuilder as _;
@@ -3709,10 +3709,8 @@ fn context_menu(
                 cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(
                     path_str.clone(),
                 ));
-                this.notice = Some((
-                    "Path copied to clipboard".into(),
-                    Status::Success,
-                ));
+                this.notice =
+                    Some(("Path copied to clipboard".into(), Status::Success));
                 cx.notify();
             }),
         ));
