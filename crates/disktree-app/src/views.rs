@@ -18,9 +18,9 @@ use gpui_kit::{
     pattern_slash, px, relative,
 };
 use gpui_omarchy::{
-    ActiveTheme, ButtonVariant, ChoiceItem, Theme, alert_dialog, button,
-    button_group, checkbox, dialog_button, dialog_description, dialog_popup,
-    dialog_title, separator, with_tooltip,
+    alert_dialog, button, button_group, checkbox, dialog_button,
+    dialog_description, dialog_popup, dialog_title, separator, with_tooltip,
+    ActiveTheme, ButtonVariant, ChoiceItem, Status, Theme,
 };
 
 use gpui_kit::prelude::FluentBuilder as _;
@@ -3711,7 +3711,7 @@ fn context_menu(
                 ));
                 this.notice = Some((
                     "Path copied to clipboard".into(),
-                    crate::state::Status::Success,
+                    Status::Success,
                 ));
                 cx.notify();
             }),
