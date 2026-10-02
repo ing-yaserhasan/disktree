@@ -213,10 +213,8 @@ pub fn duplicate_files(root: &Node, limit: usize) -> Vec<DuplicateGroup> {
                 files,
             });
         } else {
-            let mut by_name: rustc_hash::FxHashMap<
-                String,
-                Vec<DuplicateFile>,
-            > = rustc_hash::FxHashMap::default();
+            let mut by_name: rustc_hash::FxHashMap<String, Vec<DuplicateFile>> =
+                rustc_hash::FxHashMap::default();
             for file in files {
                 by_name.entry(file.name.clone()).or_default().push(file);
             }
