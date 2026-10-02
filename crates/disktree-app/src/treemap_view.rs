@@ -12,12 +12,13 @@
 use std::rc::Rc;
 
 use disktree_core::treemap::Rect;
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, Bounds, ContentMask, Context, Corners, Edges, Font, FontWeight, Hsla,
-    InteractiveElement as _, IntoElement, MouseDownEvent, MouseMoveEvent,
-    MouseUpEvent, ParentElement as _, Pixels, Point, ScrollWheelEvent,
-    SharedString, Size, StatefulInteractiveElement as _, Styled, TextAlign,
-    TextRun, Window, canvas, div, pattern_slash, px, quad,
+    InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point,
+    ScrollWheelEvent, SharedString, Size, StatefulInteractiveElement as _,
+    Styled, TextAlign, TextRun, Window, canvas, div, pattern_slash, px, quad,
 };
 use gpui_omarchy::{ActiveTheme, Theme};
 
@@ -108,9 +109,20 @@ pub fn mosaic(
         .on_any_mouse_down(cx.listener(|this, event: &MouseDownEvent, _, cx| {
             this.on_mouse_down(event, cx);
         }))
-        .on_any_mouse_up(cx.listener(|this, event: &MouseUpEvent, _, cx| {
-            this.on_mouse_up(event, cx);
-        }))
+        .on_mouse_up(
+            MouseButton::Left,
+            cx.listener(|this, event: &MouseUpEvent, _, cx| {
+                this.on_mouse_up(event, cx);
+            }),
+        )
+        .on_mouse_up(
+            MouseButton::Middle,
+            cx.listener(|this, event: &MouseUpEvent, _, cx| {
+                this.on_mouse_up(event, cx);
+            }),
+        )
+        .when(app.is_panning(), |d| d.cursor_grabbing())
+        .when(!app.is_panning() && app.view.scale > 1.0, |d| d.cursor_grab())
         .on_scroll_wheel(cx.listener(
             |this, event: &ScrollWheelEvent, _, cx| {
                 this.on_scroll_wheel(event, cx);

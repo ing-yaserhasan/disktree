@@ -13,7 +13,8 @@ use std::time::{Duration, Instant};
 use disktree_core::access::file_table_readable;
 use disktree_core::filter::{Keep, Matches, filter};
 use disktree_core::insights::{
-    Candidate, LargestFile, largest_files, worth_a_look,
+    Candidate, DuplicateFile, DuplicateGroup, LargestFile, duplicate_files,
+    largest_files, worth_a_look,
 };
 use disktree_core::removal::{
     Plan, RemovalEvent, RemovalHandle, RemovalMode, Target, TrashBackend,
@@ -113,6 +114,7 @@ const INSIGHT_LIMIT: usize = 6;
 
 /// How many largest files the panel lists.
 const TOP_FILES_LIMIT: usize = 10;
+const DUPLICATES_LIMIT: usize = 50;
 
 /// Which list the side panel displays above the marked list.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -122,6 +124,8 @@ pub enum SideListTab {
     Worth,
     /// The largest individual files.
     Files,
+    /// Duplicate files in the tree.
+    Duplicates,
 }
 
 /// Which screen the app is showing.
@@ -431,6 +435,8 @@ pub struct Disktree {
     /// Drag-to-pan: where the pointer was when panning started,
     /// and the view origin at that moment.
     pan_start: Option<(f32, f32, f32, f32)>,
+    /// Whether a drag-to-pan operation is active.
+    pub is_panning: bool,
 
     pub color_mode: ColorMode,
     /// Which list tab is active in the side panel.
@@ -439,6 +445,8 @@ pub struct Disktree {
     pub insights: Vec<Candidate>,
     /// The largest individual files, recomputed when a scan lands.
     pub top_files: Vec<LargestFile>,
+    /// Duplicate files in the scanned tree.
+    pub duplicate_files: Vec<DuplicateGroup>,
     /// What git knows about each checkout that has been selected; `None`
     /// once asked and found not to be one.
     pub git: FxHashMap<PathBuf, Option<GitState>>,
@@ -550,10 +558,12 @@ impl Disktree {
             crumb_menu: None,
             context_menu: None,
             pan_start: None,
+            is_panning: false,
             color_mode: ColorMode::Kind,
             side_tab: SideListTab::Worth,
             insights: Vec::new(),
             top_files: Vec::new(),
+            duplicate_files: Vec::new(),
             git: FxHashMap::default(),
             git_pending: FxHashSet::default(),
             device: None,
@@ -771,7 +781,7 @@ impl Disktree {
         }
     }
 
-    /// Recompute "worth a look" and largest files from the tree on screen.
+    /// Recompute "worth a look", largest files, and duplicate files.
     fn refresh_insights(&mut self) {
         self.scanned_at = now_seconds();
         self.insights = self.tree.as_deref().map_or_else(Vec::new, |tree| {
@@ -781,6 +791,17 @@ impl Disktree {
             .tree
             .as_deref()
             .map_or_else(Vec::new, |tree| largest_files(tree, TOP_FILES_LIMIT));
+        self.duplicate_files = self
+            .tree
+            .as_deref()
+            .map_or_else(Vec::new, |tree| {
+                duplicate_files(tree, DUPLICATES_LIMIT)
+            });
+    }
+
+    /// Whether the treemap is currently being dragged to pan.
+    pub const fn is_panning(&self) -> bool {
+        self.is_panning
     }
 
     /// Ask git about `path` once, off the UI thread, if it is a checkout.
@@ -2661,7 +2682,8 @@ impl Disktree {
             "f" if !control => {
                 self.side_tab = match self.side_tab {
                     SideListTab::Worth => SideListTab::Files,
-                    SideListTab::Files => SideListTab::Worth,
+                    SideListTab::Files => SideListTab::Duplicates,
+                    SideListTab::Duplicates => SideListTab::Worth,
                 };
                 cx.notify();
             }
@@ -2740,12 +2762,17 @@ impl Disktree {
         if let Some((start_x, start_y, ox, oy)) = self.pan_start {
             let dx = (local.x.as_f32() - start_x) / self.view.scale;
             let dy = (local.y.as_f32() - start_y) / self.view.scale;
-            let area = self.treemap_size.get();
-            self.view.origin_x = ox - dx;
-            self.view.origin_y = oy - dy;
-            self.view = self.view.clamped(area);
-            cx.notify();
-            return;
+            if self.view.scale > 1.0
+                && (dx.abs() > 2.0 || dy.abs() > 2.0 || self.is_panning)
+            {
+                self.is_panning = true;
+                let area = self.treemap_size.get();
+                self.view.origin_x = ox - dx;
+                self.view.origin_y = oy - dy;
+                self.view = self.view.clamped(area);
+                cx.notify();
+                return;
+            }
         }
 
         // Moves are delivered here even when the pointer is elsewhere in the
@@ -2778,7 +2805,11 @@ impl Disktree {
     pub fn on_mouse_leave(&mut self, cx: &mut Context<'_, Self>) {
         self.pointer = None;
         self.pointer_active = false;
-        if self.hovered.take().is_some() {
+        let changed = self.hovered.take().is_some()
+            || self.pan_start.take().is_some()
+            || self.is_panning;
+        self.is_panning = false;
+        if changed {
             cx.notify();
         }
     }
@@ -2821,6 +2852,8 @@ impl Disktree {
             }
             MouseButton::Left => {
                 self.context_menu = None;
+                self.pan_start =
+                    Some((x, y, self.view.origin_x, self.view.origin_y));
                 let activate = crumbs.as_ref().is_some_and(|crumbs| {
                     self.selected.as_ref() == Some(crumbs)
                         && self.node_at(crumbs).is_some_and(Node::is_dir)
@@ -2856,14 +2889,15 @@ impl Disktree {
         }
     }
 
-    /// Release: stop panning if a middle-button drag was active.
+    /// Release: stop panning if a drag was active.
     pub fn on_mouse_up(
         &mut self,
-        event: &MouseUpEvent,
-        _cx: &mut Context<'_, Self>,
+        _event: &MouseUpEvent,
+        cx: &mut Context<'_, Self>,
     ) {
-        if event.button == MouseButton::Middle {
-            self.pan_start = None;
+        if self.pan_start.take().is_some() || self.is_panning {
+            self.is_panning = false;
+            cx.notify();
         }
     }
 

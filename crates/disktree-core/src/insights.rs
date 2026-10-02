@@ -137,6 +137,28 @@ pub struct LargestFile {
     pub bytes: u64,
 }
 
+/// A group of duplicate files sharing the same byte size.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DuplicateGroup {
+    /// Size of each duplicate file in bytes.
+    pub bytes: u64,
+    /// Total potential space wasted: `bytes * (files.len() - 1)`.
+    pub wasted_bytes: u64,
+    /// The duplicate files in this group.
+    pub files: Vec<DuplicateFile>,
+}
+
+/// A duplicate file candidate within a group.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DuplicateFile {
+    /// File name.
+    pub name: String,
+    /// Path crumbs from root.
+    pub crumbs: Vec<usize>,
+    /// File size in bytes.
+    pub bytes: u64,
+}
+
 /// The `limit` largest files beneath `root`, largest first.
 pub fn largest_files(root: &Node, limit: usize) -> Vec<LargestFile> {
     if limit == 0 {
@@ -155,6 +177,86 @@ pub fn largest_files(root: &Node, limit: usize) -> Vec<LargestFile> {
         .collect();
     files.sort_by_key(|candidate| std::cmp::Reverse(candidate.bytes));
     files
+}
+
+/// Detect groups of duplicate files beneath `root`, sorted by wasted bytes.
+///
+/// Files are considered duplicate candidates if they have non-zero identical
+/// sizes and either:
+/// 1. Share the exact same name, or
+/// 2. Are >= 64 KiB with identical byte counts.
+pub fn duplicate_files(root: &Node, limit: usize) -> Vec<DuplicateGroup> {
+    if limit == 0 {
+        return Vec::new();
+    }
+    let mut files_by_size: rustc_hash::FxHashMap<u64, Vec<DuplicateFile>> =
+        rustc_hash::FxHashMap::default();
+    let mut crumbs = Vec::new();
+    for (index, child) in root.children.iter().enumerate() {
+        crumbs.push(index);
+        collect_duplicate_candidates(child, &mut crumbs, &mut files_by_size);
+        crumbs.pop();
+    }
+
+    let mut groups = Vec::new();
+    for (bytes, files) in files_by_size {
+        if files.len() < 2 || bytes == 0 {
+            continue;
+        }
+        // Sub-partition: files >= 64 KiB with byte-exact match are candidates.
+        // Files < 64 KiB must also share the same name to avoid false matches.
+        if bytes >= 64 * 1024 {
+            let wasted = bytes.saturating_mul(files.len() as u64 - 1);
+            groups.push(DuplicateGroup {
+                bytes,
+                wasted_bytes: wasted,
+                files,
+            });
+        } else {
+            let mut by_name: rustc_hash::FxHashMap<&str, Vec<DuplicateFile>> =
+                rustc_hash::FxHashMap::default();
+            for file in files {
+                by_name.entry(&file.name).or_default().push(file);
+            }
+            for (_, name_files) in by_name {
+                if name_files.len() >= 2 {
+                    let wasted =
+                        bytes.saturating_mul(name_files.len() as u64 - 1);
+                    groups.push(DuplicateGroup {
+                        bytes,
+                        wasted_bytes: wasted,
+                        files: name_files,
+                    });
+                }
+            }
+        }
+    }
+
+    groups.sort_by_key(|group| std::cmp::Reverse(group.wasted_bytes));
+    if groups.len() > limit {
+        groups.truncate(limit);
+    }
+    groups
+}
+
+fn collect_duplicate_candidates(
+    node: &Node,
+    crumbs: &mut Vec<usize>,
+    acc: &mut rustc_hash::FxHashMap<u64, Vec<DuplicateFile>>,
+) {
+    if node.is_dir() {
+        for (index, child) in node.children.iter().enumerate() {
+            crumbs.push(index);
+            collect_duplicate_candidates(child, crumbs, acc);
+            crumbs.pop();
+        }
+    } else if node.kind == crate::tree::NodeKind::File && node.bytes > 0 {
+        acc.entry(node.bytes).or_default().push(DuplicateFile {
+            name: node.name.to_string(),
+            crumbs: crumbs.clone(),
+            bytes: node.bytes,
+        });
+    }
 }
 
 fn visit_largest_files(
@@ -345,4 +447,38 @@ mod tests {
         let empty = dir("empty", Vec::new());
         assert!(largest_files(&empty, 5).is_empty());
     }
+
+    #[test]
+    fn duplicate_files_finds_and_ranks_duplicates() {
+        let root = scan(dir(
+            "root",
+            vec![
+                dir(
+                    "d1",
+                    vec![
+                        file("video.mp4", 100 * 1024 * 1024, 0),
+                        file("shared.txt", 500, 0),
+                    ],
+                ),
+                dir(
+                    "d2",
+                    vec![
+                        file("video.mp4", 100 * 1024 * 1024, 0),
+                        file("shared.txt", 500, 0),
+                        file("unique.txt", 500, 0),
+                    ],
+                ),
+            ],
+        ));
+        let dupes = duplicate_files(&root, 10);
+        assert_eq!(dupes.len(), 2);
+        assert_eq!(dupes[0].bytes, 100 * 1024 * 1024);
+        assert_eq!(dupes[0].wasted_bytes, 100 * 1024 * 1024);
+        assert_eq!(dupes[0].files.len(), 2);
+
+        assert_eq!(dupes[1].bytes, 500);
+        assert_eq!(dupes[1].wasted_bytes, 500);
+        assert_eq!(dupes[1].files.len(), 2);
+    }
 }
+

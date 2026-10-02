@@ -1366,7 +1366,7 @@ fn selection_section(
                 format!("Unmark {}", short_name(ancestor))
             }
             _ if marked => "Unmark".to_string(),
-            _ => "Mark for removal".to_string(),
+            _ => "Delete".to_string(),
         };
         let mark = button("mark", label, ButtonVariant::Primary, cx)
             .tab_stop(false)
@@ -1413,10 +1413,18 @@ fn list_section(
 ) -> Div {
     let highlight = palette::highlight(theme);
     let is_worth = app.side_tab == SideListTab::Worth;
-    let total: u64 = if is_worth {
-        app.insights.iter().map(|candidate| candidate.bytes).sum()
-    } else {
-        app.top_files.iter().map(|file| file.bytes).sum()
+    let is_files = app.side_tab == SideListTab::Files;
+    let is_dupes = app.side_tab == SideListTab::Duplicates;
+    let total: u64 = match app.side_tab {
+        SideListTab::Worth => {
+            app.insights.iter().map(|candidate| candidate.bytes).sum()
+        }
+        SideListTab::Files => {
+            app.top_files.iter().map(|file| file.bytes).sum()
+        }
+        SideListTab::Duplicates => {
+            app.duplicate_files.iter().map(|g| g.wasted_bytes).sum()
+        }
     };
 
     let tab_btn = |title: &'static str, active: bool, target: SideListTab| {
@@ -1457,7 +1465,12 @@ fn list_section(
                 .items_center()
                 .gap(space::SM)
                 .child(tab_btn("Worth a look", is_worth, SideListTab::Worth))
-                .child(tab_btn("Largest files", !is_worth, SideListTab::Files)),
+                .child(tab_btn("Largest files", is_files, SideListTab::Files))
+                .child(tab_btn(
+                    "Duplicates",
+                    is_dupes,
+                    SideListTab::Duplicates,
+                )),
         )
         .when(total > 0, |this| {
             this.child(
@@ -1470,10 +1483,14 @@ fn list_section(
 
     let section = div().flex().flex_col().gap(space::XS).child(header);
 
-    if is_worth {
-        render_worth_items(section, app, theme, cx)
-    } else {
-        render_largest_files_items(section, app, theme, cx)
+    match app.side_tab {
+        SideListTab::Worth => render_worth_items(section, app, theme, cx),
+        SideListTab::Files => {
+            render_largest_files_items(section, app, theme, cx)
+        }
+        SideListTab::Duplicates => {
+            render_duplicate_items(section, app, theme, cx)
+        }
     }
 }
 
@@ -1683,6 +1700,150 @@ fn render_largest_files_items(
                         )),
                 ),
         );
+    }
+    section
+}
+
+fn render_duplicate_items(
+    mut section: Div,
+    app: &Disktree,
+    theme: &Theme,
+    cx: &Context<'_, Disktree>,
+) -> Div {
+    if app.duplicate_files.is_empty() {
+        return section.child(
+            div()
+                .text_size(text::CAPTION)
+                .text_color(theme.secondary)
+                .child(if app.tree().is_some() {
+                    "No duplicate files found"
+                } else {
+                    "Waiting for the scan"
+                }),
+        );
+    }
+    let selected = app.action_target();
+    let tree = app.tree();
+    for (group_idx, group) in app.duplicate_files.iter().enumerate() {
+        section = section.child(
+            div()
+                .flex()
+                .flex_row()
+                .justify_between()
+                .items_center()
+                .pt(if group_idx > 0 { space::SM } else { px(0.) })
+                .pb(space::XXS)
+                .px(space::XS)
+                .child(
+                    div()
+                        .text_size(text::CAPTION)
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(palette::highlight(theme))
+                        .child(format!(
+                            "{} copies · {} each",
+                            group.files.len(),
+                            human_bytes(group.bytes),
+                        )),
+                )
+                .child(
+                    div()
+                        .text_size(text::CAPTION)
+                        .text_color(theme.secondary.opacity(0.8))
+                        .child(format!(
+                            "{} duplicate",
+                            human_bytes(group.wasted_bytes),
+                        )),
+                ),
+        );
+
+        for (file_idx, file) in group.files.iter().enumerate() {
+            let Some(node) = app.node_at(&file.crumbs) else {
+                continue;
+            };
+            let accent = palette::category_accent(theme, node.category);
+            let active = selected.as_deref() == Some(file.crumbs.as_slice());
+            let crumbs = file.crumbs.clone();
+            let detail = tree.map_or_else(String::new, |t| {
+                let chain = t.resolve_chain(&file.crumbs);
+                if chain.len() > 2 {
+                    let parts: Vec<&str> = chain
+                        .iter()
+                        .skip(1)
+                        .take(chain.len().saturating_sub(2))
+                        .map(|n| &*n.name)
+                        .collect();
+                    let start = parts.len().saturating_sub(2);
+                    parts[start..].join("/")
+                } else {
+                    String::new()
+                }
+            });
+
+            section = section.child(
+                div()
+                    .id(ElementId::Name(
+                        format!("dup-file-{group_idx}-{file_idx}").into(),
+                    ))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(space::SM)
+                    .px(space::SM)
+                    .py(space::XS)
+                    .when(active, |this| this.bg(theme.hover_fill()))
+                    .hover(|style| style.bg(theme.hover_fill()))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.reveal(crumbs.clone(), cx);
+                        window.focus(&this.focus, cx);
+                    }))
+                    .child(
+                        div()
+                            .flex_shrink_0()
+                            .w(px(2.))
+                            .h(space::XL)
+                            .bg(accent),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .text_size(text::BODY)
+                                    .text_color(theme.bright)
+                                    .whitespace_nowrap()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(
+                                        crate::bidi::fix_rtl(&file.name)
+                                            .into_owned(),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .text_size(text::CAPTION)
+                                    .text_color(theme.secondary.opacity(0.8))
+                                    .whitespace_nowrap()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(if detail.is_empty() {
+                                        node.category.label().to_string()
+                                    } else {
+                                        detail
+                                    }),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex_shrink_0()
+                            .text_size(text::BODY)
+                            .text_color(theme.secondary)
+                            .child(human_bytes(file.bytes)),
+                    ),
+            );
+        }
     }
     section
 }
