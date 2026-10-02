@@ -390,6 +390,9 @@ pub struct Disktree {
     /// The permanent-deletion alert dialog is open. Trash needs no dialog: it
     /// is reversible, so it commits directly.
     pub confirm_open: bool,
+    /// When deleting directly from an item or key, track the single target
+    /// so cancelling cleans up the mark.
+    pub single_delete_target: Option<PathBuf>,
     /// Focus owner for the alert dialog while it is open.
     pub confirm_focus: FocusHandle,
     /// Focus to move on the next occasion a window is in hand. Key handling
@@ -533,6 +536,7 @@ impl Disktree {
             },
             trash_backend,
             confirm_open: false,
+            single_delete_target: None,
             confirm_focus: cx.focus_handle(),
             focus_request: None,
             window_title: String::new(),
@@ -2068,9 +2072,38 @@ impl Disktree {
         }
     }
 
+    /// Prompt immediate deletion of an item or selection:
+    /// marks it and opens the delete confirmation dialog.
+    pub fn prompt_delete(
+        &mut self,
+        crumbs: &[usize],
+        cx: &mut Context<'_, Self>,
+    ) {
+        let Some(path) = self.path_at(crumbs) else {
+            return;
+        };
+        if !self.can_remove(&path) {
+            self.notice =
+                Some(("This path cannot be removed".into(), Status::Warning));
+            cx.notify();
+            return;
+        }
+        if !self.marks.contains(&path) {
+            self.marks.clear();
+            self.single_delete_target = Some(path.clone());
+            self.toggle_mark(crumbs, cx);
+        } else {
+            self.single_delete_target = None;
+        }
+        self.confirm_open = true;
+        self.focus_request = Some(FocusTarget::Dialog);
+        cx.notify();
+    }
+
     /// The alert dialog's `Delete`.
     pub fn confirm_delete(&mut self, cx: &mut Context<'_, Self>) {
         self.confirm_open = false;
+        self.single_delete_target = None;
         self.focus_request = Some(FocusTarget::Root);
         self.begin_removal(cx);
     }
@@ -2078,6 +2111,9 @@ impl Disktree {
     /// The alert dialog's `Cancel`, or Escape.
     pub fn cancel_delete(&mut self, cx: &mut Context<'_, Self>) {
         self.confirm_open = false;
+        if let Some(target) = self.single_delete_target.take() {
+            self.unmark(&target, cx);
+        }
         self.focus_request = Some(FocusTarget::Root);
         cx.notify();
     }
@@ -2599,6 +2635,7 @@ impl Disktree {
                 | "x"
                 | "enter"
                 | "tab"
+                | "delete"
                 | "left"
                 | "right"
                 | "up"
@@ -2640,6 +2677,11 @@ impl Disktree {
             }
             "space" => self.toggle_mark_selected(cx),
             "x" if !control => self.toggle_mark_selected(cx),
+            "delete" => {
+                if let Some(selected) = self.selected.clone() {
+                    self.prompt_delete(&selected, cx);
+                }
+            }
             "tab" => self.cycle_sibling(if shift { -1 } else { 1 }, cx),
             "c" if !control => {
                 if self.marks.is_empty() {

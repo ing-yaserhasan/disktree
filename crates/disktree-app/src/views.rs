@@ -265,17 +265,37 @@ fn delete_dialog(
     cx: &mut Context<'_, Disktree>,
 ) -> impl IntoElement {
     let plan = app.plan();
+    let is_trash = app.removal_mode == RemovalMode::Trash;
     let title = match plan.targets.as_slice() {
+        [only] if is_trash => format!(
+            "Move \u{201c}{}\u{201d} to {}?",
+            short_name(&only.path),
+            app.trash_backend.label()
+        ),
         [only] => format!(
             "Delete \u{201c}{}\u{201d} permanently?",
             short_name(&only.path)
         ),
+        targets if is_trash => format!(
+            "Move {} items to {}?",
+            targets.len(),
+            app.trash_backend.label()
+        ),
         targets => format!("Delete {} items permanently?", targets.len()),
     };
-    let body = format!(
-        "This frees {}. Deleted files can\u{2019}t be recovered; move them to the trash if you might need them again.",
-        human_bytes(plan.bytes())
-    );
+    let body = if is_trash {
+        format!(
+            "This frees {}. Items can be restored from {} if needed.",
+            human_bytes(plan.bytes()),
+            app.trash_backend.label()
+        )
+    } else {
+        format!(
+            "This frees {}. Deleted files can\u{2019}t be recovered; \
+             move them to the trash if you might need them again.",
+            human_bytes(plan.bytes())
+        )
+    };
     let confirm = cx.entity().downgrade();
     let cancel = confirm.clone();
     let actions = div()
@@ -920,6 +940,22 @@ fn view_settings(
                 )
             })
     };
+    let can_ascend = app.parent_crumbs().is_some();
+    let up_button = with_tooltip(
+        button("history-up", "↑", ButtonVariant::Secondary, cx)
+            .tab_stop(false)
+            .disabled(!can_ascend)
+            .hover(|style| {
+                style
+                    .bg(theme.hover_fill())
+                    .border_color(theme.foreground.opacity(0.))
+            })
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.ascend(cx);
+                window.focus(&this.focus, cx);
+            })),
+        "Up to parent folder · Backspace or u",
+    );
     let history = div()
         .flex()
         .flex_row()
@@ -939,7 +975,8 @@ fn view_settings(
             false,
             Disktree::go_forward,
             cx,
-        ));
+        ))
+        .child(up_button);
 
     let depth = app.layout_options.max_depth;
     let stepper = |id: &'static str,
@@ -996,18 +1033,17 @@ fn trail_and_legend(
     theme: &Theme,
     cx: &Context<'_, Disktree>,
 ) -> Div {
-    let mut row = div()
+    div()
         .flex()
         .flex_row()
         .items_center()
         .gap(space::LG)
         .px(space::LG)
         .py(space::SM)
-        .child(scan_totals(app, theme));
-    if app.find_open || !app.find.is_empty() {
-        row = row.child(find_field(app, theme));
-    }
-    row.child(div().flex_1()).child(legend(app, theme, cx))
+        .child(scan_totals(app, theme))
+        .child(find_field(app, theme, cx))
+        .child(div().flex_1())
+        .child(legend(app, theme, cx))
 }
 
 /// What the whole scan found, as one quiet line; unreadable paths are
@@ -1353,39 +1389,92 @@ fn selection_section(
         let ancestor =
             path.as_deref().and_then(|path| app.marked_ancestor(path));
         let crumbs = target;
-        let label = match &ancestor {
-            Some(ancestor) if !marked => {
-                format!("Unmark {}", short_name(ancestor))
-            }
-            _ if marked => "Unmark".to_string(),
-            _ => "Delete".to_string(),
-        };
-        let mark = button("mark", label, ButtonVariant::Primary, cx)
-            .tab_stop(false)
-            .flex_1()
-            .justify_center()
-            .on_click(cx.listener(move |this, _, window, cx| {
-                if let Some(ancestor) = ancestor.as_deref().filter(|_| !marked)
-                {
-                    this.unmark(ancestor, cx);
-                } else {
-                    this.toggle_mark(&crumbs.clone(), cx);
-                }
-                window.focus(&this.focus, cx);
-            }));
-        let filled = !marked && covered_by.is_none();
-        actions = actions.child(if filled {
-            let on = palette::on_highlight(theme);
-            mark.bg(highlight)
-                .border_color(highlight)
-                .text_color(on)
-                .font_weight(FontWeight::SEMIBOLD)
-                .hover(move |style| {
-                    style.bg(highlight.opacity(0.85)).border_color(highlight)
-                })
+        if let Some(ancestor) = ancestor.as_deref().filter(|_| !marked) {
+            let ancestor_clone = ancestor.to_path_buf();
+            actions = actions.child(
+                button(
+                    "unmark-ancestor",
+                    format!("Unmark {}", short_name(ancestor)),
+                    ButtonVariant::Outline,
+                    cx,
+                )
+                .tab_stop(false)
+                .flex_1()
+                .justify_center()
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.unmark(&ancestor_clone, cx);
+                    window.focus(&this.focus, cx);
+                })),
+            );
+        } else if marked {
+            let unmark_crumbs = crumbs.clone();
+            let delete_crumbs = crumbs.clone();
+            actions = actions
+                .child(
+                    button(
+                        "mark",
+                        "Unmark",
+                        ButtonVariant::Outline,
+                        cx,
+                    )
+                    .tab_stop(false)
+                    .flex_1()
+                    .justify_center()
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.toggle_mark(&unmark_crumbs, cx);
+                        window.focus(&this.focus, cx);
+                    })),
+                )
+                .child(
+                    button(
+                        "delete-direct",
+                        "Delete Now…",
+                        ButtonVariant::Danger,
+                        cx,
+                    )
+                    .tab_stop(false)
+                    .flex_1()
+                    .justify_center()
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.prompt_delete(&delete_crumbs, cx);
+                        this.apply_focus(window, cx);
+                    })),
+                );
         } else {
-            mark
-        });
+            let delete_crumbs = crumbs.clone();
+            let mark_crumbs = crumbs.clone();
+            actions = actions
+                .child(
+                    button(
+                        "delete-direct",
+                        "Delete…",
+                        ButtonVariant::Danger,
+                        cx,
+                    )
+                    .tab_stop(false)
+                    .flex_1()
+                    .justify_center()
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.prompt_delete(&delete_crumbs, cx);
+                        this.apply_focus(window, cx);
+                    })),
+                )
+                .child(
+                    button(
+                        "mark",
+                        "Mark",
+                        ButtonVariant::Outline,
+                        cx,
+                    )
+                    .tab_stop(false)
+                    .flex_1()
+                    .justify_center()
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.toggle_mark(&mark_crumbs, cx);
+                        window.focus(&this.focus, cx);
+                    })),
+                );
+        }
     }
 
     section
@@ -2310,7 +2399,8 @@ fn review_button(
 /// to every other key and the scan's own numbers hold the trailing edge.
 fn key_bar(app: &Disktree, theme: &Theme, cx: &App) -> Div {
     // Most useful first, so a narrow window clips the least useful.
-    let hints: [(&str, &str); 11] = [
+    let hints: [(&str, &str); 12] = [
+        ("del", "delete"),
         ("space", "mark"),
         ("enter", "open"),
         ("\u{232b}", "up"),
@@ -2504,14 +2594,19 @@ fn scanning_panel(
     panel
 }
 
-fn find_field(app: &Disktree, theme: &Theme) -> Div {
+fn find_field(
+    app: &Disktree,
+    theme: &Theme,
+    cx: &Context<'_, Disktree>,
+) -> Div {
     // What the text matches, said beside it as it is typed, and what Enter
     // and Escape will do with it.
     let (summary, hint) = match app.matches.as_deref() {
         _ if app.finding && app.matches.is_none() => {
             ("searching…".to_string(), "")
         }
-        None => (String::new(), "type to filter"),
+        None if app.find_open => (String::new(), "type to filter"),
+        None => (String::new(), "/ to filter"),
         Some(matches) if matches.count == 0 => {
             ("no matches".to_string(), "esc clears")
         }
@@ -2530,7 +2625,11 @@ fn find_field(app: &Disktree, theme: &Theme) -> Div {
         ),
     };
     let highlight = palette::highlight(theme);
+    let is_active = app.find_open;
+    let has_query = !app.find.is_empty();
+
     div()
+        .id("search-field")
         .flex()
         .flex_row()
         .items_center()
@@ -2538,21 +2637,30 @@ fn find_field(app: &Disktree, theme: &Theme) -> Div {
         .px(space::SM)
         .py(space::XS)
         .min_w_0()
+        .cursor_pointer()
         .border_1()
-        .border_color(if app.find_open {
+        .border_color(if is_active {
             theme.accent
         } else if app.filter_applied {
             highlight
         } else {
             theme.control_border()
         })
+        .hover(|style| style.border_color(theme.accent.opacity(0.7)))
         .bg(theme.normal_fill())
         .text_size(text::BODY)
+        .on_click(cx.listener(|this, _, window, cx| {
+            this.find_open = true;
+            window.focus(&this.focus, cx);
+            cx.notify();
+        }))
         .child(
             gpui_omarchy::icon(gpui_omarchy::IconName::Search)
                 .size(icon::SM)
                 .text_color(if app.filter_applied {
                     highlight
+                } else if is_active {
+                    theme.accent
                 } else {
                     theme.secondary
                 }),
@@ -2560,9 +2668,27 @@ fn find_field(app: &Disktree, theme: &Theme) -> Div {
         .child(if app.find.is_empty() {
             div()
                 .text_color(theme.secondary.opacity(0.7))
-                .child("Filter by name")
+                .child(if is_active {
+                    "Type to filter files…"
+                } else {
+                    "Search files… (/)"
+                })
         } else {
-            div().text_color(theme.bright).child(app.find.clone())
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(space::XXS)
+                .child(
+                    div().text_color(theme.bright).child(app.find.clone()),
+                )
+                .when(is_active, |this| {
+                    this.child(
+                        div()
+                            .text_color(theme.accent)
+                            .child("|"),
+                    )
+                })
         })
         .when(!summary.is_empty(), |this| {
             this.child(
@@ -2577,13 +2703,31 @@ fn find_field(app: &Disktree, theme: &Theme) -> Div {
                     .child(summary),
             )
         })
-        .child(
-            div()
-                .text_size(text::CAPTION)
-                .text_color(theme.secondary.opacity(0.6))
-                .whitespace_nowrap()
-                .child(hint),
-        )
+        .when(!hint.is_empty(), |this| {
+            this.child(
+                div()
+                    .text_size(text::CAPTION)
+                    .text_color(theme.secondary.opacity(0.6))
+                    .whitespace_nowrap()
+                    .child(hint),
+            )
+        })
+        .when(has_query, |this| {
+            this.child(
+                div()
+                    .id("clear-search-btn")
+                    .px(space::XXS)
+                    .text_size(text::CAPTION)
+                    .text_color(theme.secondary)
+                    .hover(|style| style.text_color(theme.bright))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.clear_filter();
+                        window.focus(&this.focus, cx);
+                        cx.notify();
+                    }))
+                    .child("✕"),
+            )
+        })
 }
 
 fn short_name(path: &std::path::Path) -> String {
@@ -3751,7 +3895,7 @@ fn context_menu(
 
     let rem = window.rem_size().as_f32();
     let width = 16.0 * rem;
-    let estimated_height = (if is_dir { 8.5 } else { 7.0 }) * rem;
+    let estimated_height = (if is_dir { 10.5 } else { 9.0 }) * rem;
     let window_size = window.bounds().size;
 
     let x = if menu.position.x.as_f32() + width
@@ -3825,8 +3969,22 @@ fn context_menu(
         ));
     }
 
+    let delete_crumbs = target_crumbs.clone();
+    panel = panel.child(context_menu_item(
+        "cm-delete",
+        "Delete…",
+        "Del",
+        gpui_omarchy::IconName::X,
+        &theme,
+        cx.listener(move |this, _, window, cx| {
+            this.context_menu = None;
+            this.prompt_delete(&delete_crumbs, cx);
+            this.apply_focus(window, cx);
+        }),
+    ));
+
     let mark_crumbs = target_crumbs;
-    let mark_label = if is_marked { "Unmark" } else { "Delete" };
+    let mark_label = if is_marked { "Unmark" } else { "Mark (Select)" };
     panel = panel.child(context_menu_item(
         "cm-mark",
         mark_label,
