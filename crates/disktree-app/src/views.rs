@@ -3711,7 +3711,7 @@ fn context_menu(
                 ));
                 this.notice = Some((
                     "Path copied to clipboard".into(),
-                    crate::state::Status::Notice,
+                    crate::state::Status::Success,
                 ));
                 cx.notify();
             }),
@@ -3739,12 +3739,7 @@ fn context_menu_item(
     key_hint: &'static str,
     icon: gpui_omarchy::IconName,
     theme: &gpui_omarchy::Theme,
-    on_click: impl Fn(
-        &mut Disktree,
-        &ClickEvent,
-        &mut Window,
-        &mut Context<'_, Disktree>,
-    ) + 'static,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> Stateful<Div> {
     div()
         .id(ElementId::Name(id.into()))
@@ -3773,7 +3768,7 @@ fn context_menu_item(
         )
         .child(
             div()
-                .text_color(theme.dim)
+                .text_color(theme.secondary.opacity(0.6))
                 .text_size(text::CAPTION)
                 .child(key_hint),
         )
