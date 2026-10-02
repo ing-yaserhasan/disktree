@@ -2082,12 +2082,12 @@ impl Disktree {
         let Some(path) = self.path_at(crumbs) else {
             return;
         };
-        if !self.marks.contains(&path) {
-            self.marks.clear();
-            self.single_delete_target = Some(path.clone());
-            self.toggle_mark(crumbs, cx);
-        } else {
+        if self.marks.contains(&path) {
             self.single_delete_target = None;
+        } else {
+            self.marks.clear();
+            self.single_delete_target = Some(path);
+            self.toggle_mark(crumbs, cx);
         }
         self.confirm_open = true;
         self.focus_request = Some(FocusTarget::Dialog);

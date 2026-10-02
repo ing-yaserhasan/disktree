@@ -1410,7 +1410,7 @@ fn selection_section(
             );
         } else if marked {
             let unmark_crumbs = crumbs.clone();
-            let delete_crumbs = crumbs.clone();
+            let delete_crumbs = crumbs;
             actions = actions
                 .child(
                     button("mark", "Unmark", ButtonVariant::Outline, cx)
@@ -1441,7 +1441,7 @@ fn selection_section(
                 );
         } else {
             let delete_crumbs = crumbs.clone();
-            let mark_crumbs = crumbs.clone();
+            let mark_crumbs = crumbs;
             actions = actions
                 .child(
                     button(
