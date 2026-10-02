@@ -2082,12 +2082,6 @@ impl Disktree {
         let Some(path) = self.path_at(crumbs) else {
             return;
         };
-        if !self.can_remove(&path) {
-            self.notice =
-                Some(("This path cannot be removed".into(), Status::Warning));
-            cx.notify();
-            return;
-        }
         if !self.marks.contains(&path) {
             self.marks.clear();
             self.single_delete_target = Some(path.clone());

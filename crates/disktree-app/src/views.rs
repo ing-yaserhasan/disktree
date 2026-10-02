@@ -2594,7 +2594,7 @@ fn find_field(
     app: &Disktree,
     theme: &Theme,
     cx: &Context<'_, Disktree>,
-) -> Div {
+) -> Stateful<Div> {
     // What the text matches, said beside it as it is typed, and what Enter
     // and Escape will do with it.
     let (summary, hint) = match app.matches.as_deref() {
