@@ -18,16 +18,16 @@ use gpui_kit::{
     pattern_slash, px, relative,
 };
 use gpui_omarchy::{
-    ActiveTheme, ButtonVariant, ChoiceItem, Theme, alert_dialog, button,
-    button_group, checkbox, dialog_button, dialog_description, dialog_popup,
-    dialog_title, separator, with_tooltip,
+    ActiveTheme, ButtonVariant, ChoiceItem, Status, Theme, alert_dialog,
+    button, button_group, checkbox, dialog_button, dialog_description,
+    dialog_popup, dialog_title, separator, with_tooltip,
 };
 
 use gpui_kit::prelude::FluentBuilder as _;
 
 use crate::palette;
 use crate::state::{
-    ColorMode, Crumb, Disktree, PANEL_REMS, Screen, panel_width,
+    ColorMode, Crumb, Disktree, PANEL_REMS, Screen, SideListTab, panel_width,
 };
 use crate::treemap_view::{self, Mosaic};
 use crate::ui::{icon, size, space, text};
@@ -117,6 +117,9 @@ pub fn root(
     if app.confirm_open {
         root = root.child(delete_dialog(app, cx));
     }
+    if let Some(menu) = context_menu(app, window, cx) {
+        root = root.child(menu);
+    }
     root
 }
 
@@ -146,12 +149,16 @@ fn volumes_dialog(
             || "unknown free".to_string(),
             |space| format!("{} free", human_bytes(space.available)),
         );
+        let is_current = volume.point == app.root_path;
+        let suffix = if is_current { " \u{00b7} current" } else { "" };
         let label = match &volume.device {
             Some(device) => format!(
-                "{}  \u{00b7}  {device}  \u{00b7}  {free}",
+                "{} \u{00b7} {device} \u{00b7} {free}{suffix}",
                 volume.point.display()
             ),
-            None => format!("{}  \u{00b7}  {free}", volume.point.display()),
+            None => {
+                format!("{} \u{00b7} {free}{suffix}", volume.point.display())
+            }
         };
         rows = rows.child(
             div()
@@ -258,17 +265,37 @@ fn delete_dialog(
     cx: &mut Context<'_, Disktree>,
 ) -> impl IntoElement {
     let plan = app.plan();
+    let is_trash = app.removal_mode == RemovalMode::Trash;
     let title = match plan.targets.as_slice() {
+        [only] if is_trash => format!(
+            "Move \u{201c}{}\u{201d} to {}?",
+            short_name(&only.path),
+            app.trash_backend.label()
+        ),
         [only] => format!(
             "Delete \u{201c}{}\u{201d} permanently?",
             short_name(&only.path)
         ),
+        targets if is_trash => format!(
+            "Move {} items to {}?",
+            targets.len(),
+            app.trash_backend.label()
+        ),
         targets => format!("Delete {} items permanently?", targets.len()),
     };
-    let body = format!(
-        "This frees {}. Deleted files can\u{2019}t be recovered; move them to the trash if you might need them again.",
-        human_bytes(plan.bytes())
-    );
+    let body = if is_trash {
+        format!(
+            "This frees {}. Items can be restored from {} if needed.",
+            human_bytes(plan.bytes()),
+            app.trash_backend.label()
+        )
+    } else {
+        format!(
+            "This frees {}. Deleted files can\u{2019}t be recovered; \
+             move them to the trash if you might need them again.",
+            human_bytes(plan.bytes())
+        )
+    };
     let confirm = cx.entity().downgrade();
     let cancel = confirm.clone();
     let actions = div()
@@ -635,7 +662,7 @@ fn sibling_menu(
         if parent.is_empty() {
             crate::marks::display_path(&app.root_path, app.home.as_deref())
         } else {
-            node.name.to_string()
+            crate::bidi::fix_rtl(&node.name).into_owned()
         }
     });
     let metric = app.options.metric;
@@ -913,6 +940,22 @@ fn view_settings(
                 )
             })
     };
+    let can_ascend = app.parent_crumbs().is_some();
+    let up_button = with_tooltip(
+        button("history-up", "↑", ButtonVariant::Secondary, cx)
+            .tab_stop(false)
+            .disabled(!can_ascend)
+            .hover(|style| {
+                style
+                    .bg(theme.hover_fill())
+                    .border_color(theme.foreground.opacity(0.))
+            })
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.ascend(cx);
+                window.focus(&this.focus, cx);
+            })),
+        "Up to parent folder · Backspace or u",
+    );
     let history = div()
         .flex()
         .flex_row()
@@ -932,7 +975,8 @@ fn view_settings(
             false,
             Disktree::go_forward,
             cx,
-        ));
+        ))
+        .child(up_button);
 
     let depth = app.layout_options.max_depth;
     let stepper = |id: &'static str,
@@ -989,18 +1033,17 @@ fn trail_and_legend(
     theme: &Theme,
     cx: &Context<'_, Disktree>,
 ) -> Div {
-    let mut row = div()
+    div()
         .flex()
         .flex_row()
         .items_center()
         .gap(space::LG)
         .px(space::LG)
         .py(space::SM)
-        .child(scan_totals(app, theme));
-    if app.find_open || !app.find.is_empty() {
-        row = row.child(find_field(app, theme));
-    }
-    row.child(div().flex_1()).child(legend(app, theme, cx))
+        .child(scan_totals(app, theme))
+        .child(find_field(app, theme, cx))
+        .child(div().flex_1())
+        .child(legend(app, theme, cx))
 }
 
 /// What the whole scan found, as one quiet line; unreadable paths are
@@ -1141,7 +1184,7 @@ fn side_panel(
                 .flex_1()
                 .min_h_0()
                 .overflow_y_scroll()
-                .child(worth_section(app, theme, cx))
+                .child(list_section(app, theme, cx))
                 .child(rule())
                 .child(marked_section(app, theme, cx)),
         )
@@ -1206,7 +1249,7 @@ fn selection_section(
                         .whitespace_nowrap()
                         .overflow_hidden()
                         .text_ellipsis()
-                        .child(node.name.to_string()),
+                        .child(crate::bidi::fix_rtl(&node.name).into_owned()),
                 ),
         )
         .child(
@@ -1346,39 +1389,88 @@ fn selection_section(
         let ancestor =
             path.as_deref().and_then(|path| app.marked_ancestor(path));
         let crumbs = target;
-        let label = match &ancestor {
-            Some(ancestor) if !marked => {
-                format!("Unmark {}", short_name(ancestor))
-            }
-            _ if marked => "Unmark".to_string(),
-            _ => "Mark for removal".to_string(),
-        };
-        let mark = button("mark", label, ButtonVariant::Primary, cx)
-            .tab_stop(false)
-            .flex_1()
-            .justify_center()
-            .on_click(cx.listener(move |this, _, window, cx| {
-                if let Some(ancestor) = ancestor.as_deref().filter(|_| !marked)
-                {
-                    this.unmark(ancestor, cx);
-                } else {
-                    this.toggle_mark(&crumbs.clone(), cx);
-                }
-                window.focus(&this.focus, cx);
-            }));
-        let filled = !marked && covered_by.is_none();
-        actions = actions.child(if filled {
-            let on = palette::on_highlight(theme);
-            mark.bg(highlight)
-                .border_color(highlight)
-                .text_color(on)
-                .font_weight(FontWeight::SEMIBOLD)
-                .hover(move |style| {
-                    style.bg(highlight.opacity(0.85)).border_color(highlight)
-                })
+        if let Some(ancestor) = ancestor.as_deref().filter(|_| !marked) {
+            let ancestor_clone = ancestor.to_path_buf();
+            actions = actions.child(
+                button(
+                    "unmark-ancestor",
+                    format!("Unmark {}", short_name(ancestor)),
+                    ButtonVariant::Outline,
+                    cx,
+                )
+                .tab_stop(false)
+                .flex_1()
+                .justify_center()
+                .on_click(cx.listener(
+                    move |this, _, window, cx| {
+                        this.unmark(&ancestor_clone, cx);
+                        window.focus(&this.focus, cx);
+                    },
+                )),
+            );
+        } else if marked {
+            let unmark_crumbs = crumbs.clone();
+            let delete_crumbs = crumbs;
+            actions = actions
+                .child(
+                    button("mark", "Unmark", ButtonVariant::Outline, cx)
+                        .tab_stop(false)
+                        .flex_1()
+                        .justify_center()
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.toggle_mark(&unmark_crumbs, cx);
+                            window.focus(&this.focus, cx);
+                        })),
+                )
+                .child(
+                    button(
+                        "delete-direct",
+                        "Delete Now…",
+                        ButtonVariant::Danger,
+                        cx,
+                    )
+                    .tab_stop(false)
+                    .flex_1()
+                    .justify_center()
+                    .on_click(cx.listener(
+                        move |this, _, window, cx| {
+                            this.prompt_delete(&delete_crumbs, cx);
+                            this.apply_focus(window, cx);
+                        },
+                    )),
+                );
         } else {
-            mark
-        });
+            let delete_crumbs = crumbs.clone();
+            let mark_crumbs = crumbs;
+            actions = actions
+                .child(
+                    button(
+                        "delete-direct",
+                        "Delete…",
+                        ButtonVariant::Danger,
+                        cx,
+                    )
+                    .tab_stop(false)
+                    .flex_1()
+                    .justify_center()
+                    .on_click(cx.listener(
+                        move |this, _, window, cx| {
+                            this.prompt_delete(&delete_crumbs, cx);
+                            this.apply_focus(window, cx);
+                        },
+                    )),
+                )
+                .child(
+                    button("mark", "Mark", ButtonVariant::Outline, cx)
+                        .tab_stop(false)
+                        .flex_1()
+                        .justify_center()
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.toggle_mark(&mark_crumbs, cx);
+                            window.focus(&this.focus, cx);
+                        })),
+                );
+        }
     }
 
     section
@@ -1389,32 +1481,100 @@ fn selection_section(
         .child(actions)
 }
 
-/// The biggest things that could plausibly go, with their total.
-fn worth_section(
+/// The side panel list above marked items: switches between "Worth a look"
+/// findings and "Largest files".
+fn list_section(
     app: &Disktree,
     theme: &Theme,
     cx: &Context<'_, Disktree>,
 ) -> Div {
-    let total: u64 = app.insights.iter().map(|candidate| candidate.bytes).sum();
-    let largest = app.insights.first().map_or(1, |candidate| candidate.bytes);
     let highlight = palette::highlight(theme);
-    let mut section = div().flex().flex_col().gap(space::XS).child(
+    let is_worth = app.side_tab == SideListTab::Worth;
+    let is_files = app.side_tab == SideListTab::Files;
+    let is_dupes = app.side_tab == SideListTab::Duplicates;
+    let total: u64 = match app.side_tab {
+        SideListTab::Worth => {
+            app.insights.iter().map(|candidate| candidate.bytes).sum()
+        }
+        SideListTab::Files => app.top_files.iter().map(|file| file.bytes).sum(),
+        SideListTab::Duplicates => {
+            app.duplicate_files.iter().map(|g| g.wasted_bytes).sum()
+        }
+    };
+
+    let tab_btn = |title: &'static str, active: bool, target: SideListTab| {
         div()
-            .flex()
-            .flex_row()
-            .items_center()
-            .justify_between()
-            .pb(space::XS)
-            .child(widgets::eyebrow("Worth a look", cx))
-            .when(total > 0, |this| {
-                this.child(
-                    div()
-                        .text_size(text::CAPTION)
-                        .text_color(highlight)
-                        .child(human_bytes(total)),
-                )
-            }),
-    );
+            .id(ElementId::Name(format!("tab-{title}").into()))
+            .px(space::XS)
+            .py(space::XXS)
+            .text_size(text::CAPTION)
+            .font_weight(if active {
+                FontWeight::SEMIBOLD
+            } else {
+                FontWeight::NORMAL
+            })
+            .text_color(if active {
+                theme.bright
+            } else {
+                theme.secondary.opacity(0.7)
+            })
+            .when(active, |this| this.border_b_2().border_color(theme.accent))
+            .hover(|style| style.text_color(theme.bright))
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.side_tab = target;
+                cx.notify();
+            }))
+            .child(title)
+    };
+
+    let header = div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .justify_between()
+        .pb(space::XS)
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(space::SM)
+                .child(tab_btn("Worth a look", is_worth, SideListTab::Worth))
+                .child(tab_btn("Largest files", is_files, SideListTab::Files))
+                .child(tab_btn(
+                    "Duplicates",
+                    is_dupes,
+                    SideListTab::Duplicates,
+                )),
+        )
+        .when(total > 0, |this| {
+            this.child(
+                div()
+                    .text_size(text::CAPTION)
+                    .text_color(highlight)
+                    .child(human_bytes(total)),
+            )
+        });
+
+    let section = div().flex().flex_col().gap(space::XS).child(header);
+
+    match app.side_tab {
+        SideListTab::Worth => render_worth_items(section, app, theme, cx),
+        SideListTab::Files => {
+            render_largest_files_items(section, app, theme, cx)
+        }
+        SideListTab::Duplicates => {
+            render_duplicate_items(section, app, theme, cx)
+        }
+    }
+}
+
+fn render_worth_items(
+    mut section: Div,
+    app: &Disktree,
+    theme: &Theme,
+    cx: &Context<'_, Disktree>,
+) -> Div {
     if app.insights.is_empty() {
         return section.child(
             div()
@@ -1427,6 +1587,7 @@ fn worth_section(
                 }),
         );
     }
+    let largest = app.insights.first().map_or(1, |c| c.bytes);
     let selected = app.action_target();
     for (index, candidate) in app.insights.iter().enumerate() {
         let Some(node) = app.node_at(&candidate.crumbs) else {
@@ -1498,6 +1659,262 @@ fn worth_section(
                         )),
                 ),
         );
+    }
+    section
+}
+
+fn render_largest_files_items(
+    mut section: Div,
+    app: &Disktree,
+    theme: &Theme,
+    cx: &Context<'_, Disktree>,
+) -> Div {
+    if app.top_files.is_empty() {
+        return section.child(
+            div()
+                .text_size(text::CAPTION)
+                .text_color(theme.secondary)
+                .child(if app.tree().is_some() {
+                    "No files found"
+                } else {
+                    "Waiting for the scan"
+                }),
+        );
+    }
+    let largest = app.top_files.first().map_or(1, |file| file.bytes);
+    let selected = app.action_target();
+    let tree = app.tree();
+    for (index, file) in app.top_files.iter().enumerate() {
+        let Some(node) = app.node_at(&file.crumbs) else {
+            continue;
+        };
+        let accent = palette::category_accent(theme, node.category);
+        let active = selected.as_deref() == Some(file.crumbs.as_slice());
+        let crumbs = file.crumbs.clone();
+        let detail = tree.map_or_else(String::new, |t| {
+            let chain = t.resolve_chain(&file.crumbs);
+            if chain.len() > 2 {
+                let parts: Vec<&str> = chain
+                    .iter()
+                    .skip(1)
+                    .take(chain.len().saturating_sub(2))
+                    .map(|n| &*n.name)
+                    .collect();
+                let start = parts.len().saturating_sub(2);
+                parts[start..].join("/")
+            } else {
+                String::new()
+            }
+        });
+        section = section.child(
+            div()
+                .id(ElementId::Name(format!("top-file-{index}").into()))
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(space::SM)
+                .px(space::SM)
+                .py(space::XS)
+                .when(active, |this| this.bg(theme.hover_fill()))
+                .hover(|style| style.bg(theme.hover_fill()))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.reveal(crumbs.clone(), cx);
+                    window.focus(&this.focus, cx);
+                }))
+                .child(div().flex_shrink_0().w(px(2.)).h(space::XL).bg(accent))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .min_w_0()
+                        .child(
+                            div()
+                                .text_size(text::BODY)
+                                .text_color(theme.bright)
+                                .whitespace_nowrap()
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .child(
+                                    crate::bidi::fix_rtl(&node.name)
+                                        .into_owned(),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_size(text::CAPTION)
+                                .text_color(theme.secondary.opacity(0.8))
+                                .whitespace_nowrap()
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .child(if detail.is_empty() {
+                                    node.category.label().to_string()
+                                } else {
+                                    detail
+                                }),
+                        ),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .items_end()
+                        .gap(space::XS)
+                        .flex_shrink_0()
+                        .w(size::ROW_BAR)
+                        .child(
+                            div()
+                                .text_size(text::BODY)
+                                .text_color(theme.bright)
+                                .child(human_bytes(file.bytes)),
+                        )
+                        .child(widgets::bar(
+                            file.bytes as f32 / largest.max(1) as f32,
+                            accent,
+                            cx,
+                        )),
+                ),
+        );
+    }
+    section
+}
+
+fn render_duplicate_items(
+    mut section: Div,
+    app: &Disktree,
+    theme: &Theme,
+    cx: &Context<'_, Disktree>,
+) -> Div {
+    if app.duplicate_files.is_empty() {
+        return section.child(
+            div()
+                .text_size(text::CAPTION)
+                .text_color(theme.secondary)
+                .child(if app.tree().is_some() {
+                    "No duplicate files found"
+                } else {
+                    "Waiting for the scan"
+                }),
+        );
+    }
+    let selected = app.action_target();
+    let tree = app.tree();
+    for (group_idx, group) in app.duplicate_files.iter().enumerate() {
+        section = section.child(
+            div()
+                .flex()
+                .flex_row()
+                .justify_between()
+                .items_center()
+                .when(group_idx > 0, |this| this.pt(space::SM))
+                .pb(space::XXS)
+                .px(space::XS)
+                .child(
+                    div()
+                        .text_size(text::CAPTION)
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(palette::highlight(theme))
+                        .child(format!(
+                            "{} copies · {} each",
+                            group.files.len(),
+                            human_bytes(group.bytes),
+                        )),
+                )
+                .child(
+                    div()
+                        .text_size(text::CAPTION)
+                        .text_color(theme.secondary.opacity(0.8))
+                        .child(format!(
+                            "{} duplicate",
+                            human_bytes(group.wasted_bytes),
+                        )),
+                ),
+        );
+
+        for (file_idx, file) in group.files.iter().enumerate() {
+            let Some(node) = app.node_at(&file.crumbs) else {
+                continue;
+            };
+            let accent = palette::category_accent(theme, node.category);
+            let active = selected.as_deref() == Some(file.crumbs.as_slice());
+            let crumbs = file.crumbs.clone();
+            let detail = tree.map_or_else(String::new, |t| {
+                let chain = t.resolve_chain(&file.crumbs);
+                if chain.len() > 2 {
+                    let parts: Vec<&str> = chain
+                        .iter()
+                        .skip(1)
+                        .take(chain.len().saturating_sub(2))
+                        .map(|n| &*n.name)
+                        .collect();
+                    let start = parts.len().saturating_sub(2);
+                    parts[start..].join("/")
+                } else {
+                    String::new()
+                }
+            });
+
+            section = section.child(
+                div()
+                    .id(ElementId::Name(
+                        format!("dup-file-{group_idx}-{file_idx}").into(),
+                    ))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(space::SM)
+                    .px(space::SM)
+                    .py(space::XS)
+                    .when(active, |this| this.bg(theme.hover_fill()))
+                    .hover(|style| style.bg(theme.hover_fill()))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.reveal(crumbs.clone(), cx);
+                        window.focus(&this.focus, cx);
+                    }))
+                    .child(
+                        div().flex_shrink_0().w(px(2.)).h(space::XL).bg(accent),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .text_size(text::BODY)
+                                    .text_color(theme.bright)
+                                    .whitespace_nowrap()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(
+                                        crate::bidi::fix_rtl(&file.name)
+                                            .into_owned(),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .text_size(text::CAPTION)
+                                    .text_color(theme.secondary.opacity(0.8))
+                                    .whitespace_nowrap()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(if detail.is_empty() {
+                                        node.category.label().to_string()
+                                    } else {
+                                        detail
+                                    }),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex_shrink_0()
+                            .text_size(text::BODY)
+                            .text_color(theme.secondary)
+                            .child(human_bytes(file.bytes)),
+                    ),
+            );
+        }
     }
     section
 }
@@ -1978,7 +2395,8 @@ fn review_button(
 /// to every other key and the scan's own numbers hold the trailing edge.
 fn key_bar(app: &Disktree, theme: &Theme, cx: &App) -> Div {
     // Most useful first, so a narrow window clips the least useful.
-    let hints: [(&str, &str); 11] = [
+    let hints: [(&str, &str); 12] = [
+        ("del", "delete"),
         ("space", "mark"),
         ("enter", "open"),
         ("\u{232b}", "up"),
@@ -2049,6 +2467,15 @@ fn key_bar(app: &Disktree, theme: &Theme, cx: &App) -> Div {
                 .text_size(text::CAPTION)
                 .text_color(theme.secondary.opacity(0.7))
                 .child(scan),
+        )
+        .child(
+            div()
+                .flex_shrink_0()
+                .px(space::XS)
+                .text_size(text::CAPTION)
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(theme.accent)
+                .child("Yaser Edition"),
         )
 }
 
@@ -2163,14 +2590,19 @@ fn scanning_panel(
     panel
 }
 
-fn find_field(app: &Disktree, theme: &Theme) -> Div {
+fn find_field(
+    app: &Disktree,
+    theme: &Theme,
+    cx: &Context<'_, Disktree>,
+) -> Stateful<Div> {
     // What the text matches, said beside it as it is typed, and what Enter
     // and Escape will do with it.
     let (summary, hint) = match app.matches.as_deref() {
         _ if app.finding && app.matches.is_none() => {
             ("searching…".to_string(), "")
         }
-        None => (String::new(), "type to filter"),
+        None if app.find_open => (String::new(), "type to filter"),
+        None => (String::new(), "/ to filter"),
         Some(matches) if matches.count == 0 => {
             ("no matches".to_string(), "esc clears")
         }
@@ -2189,7 +2621,11 @@ fn find_field(app: &Disktree, theme: &Theme) -> Div {
         ),
     };
     let highlight = palette::highlight(theme);
+    let is_active = app.find_open;
+    let has_query = !app.find.is_empty();
+
     div()
+        .id("search-field")
         .flex()
         .flex_row()
         .items_center()
@@ -2197,21 +2633,30 @@ fn find_field(app: &Disktree, theme: &Theme) -> Div {
         .px(space::SM)
         .py(space::XS)
         .min_w_0()
+        .cursor_pointer()
         .border_1()
-        .border_color(if app.find_open {
+        .border_color(if is_active {
             theme.accent
         } else if app.filter_applied {
             highlight
         } else {
             theme.control_border()
         })
+        .hover(|style| style.border_color(theme.accent.opacity(0.7)))
         .bg(theme.normal_fill())
         .text_size(text::BODY)
+        .on_click(cx.listener(|this, _, window, cx| {
+            this.find_open = true;
+            window.focus(&this.focus, cx);
+            cx.notify();
+        }))
         .child(
             gpui_omarchy::icon(gpui_omarchy::IconName::Search)
                 .size(icon::SM)
                 .text_color(if app.filter_applied {
                     highlight
+                } else if is_active {
+                    theme.accent
                 } else {
                     theme.secondary
                 }),
@@ -2219,9 +2664,21 @@ fn find_field(app: &Disktree, theme: &Theme) -> Div {
         .child(if app.find.is_empty() {
             div()
                 .text_color(theme.secondary.opacity(0.7))
-                .child("Filter by name")
+                .child(if is_active {
+                    "Type to filter files…"
+                } else {
+                    "Search files… (/)"
+                })
         } else {
-            div().text_color(theme.bright).child(app.find.clone())
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(space::XXS)
+                .child(div().text_color(theme.bright).child(app.find.clone()))
+                .when(is_active, |this| {
+                    this.child(div().text_color(theme.accent).child("|"))
+                })
         })
         .when(!summary.is_empty(), |this| {
             this.child(
@@ -2236,13 +2693,31 @@ fn find_field(app: &Disktree, theme: &Theme) -> Div {
                     .child(summary),
             )
         })
-        .child(
-            div()
-                .text_size(text::CAPTION)
-                .text_color(theme.secondary.opacity(0.6))
-                .whitespace_nowrap()
-                .child(hint),
-        )
+        .when(!hint.is_empty(), |this| {
+            this.child(
+                div()
+                    .text_size(text::CAPTION)
+                    .text_color(theme.secondary.opacity(0.6))
+                    .whitespace_nowrap()
+                    .child(hint),
+            )
+        })
+        .when(has_query, |this| {
+            this.child(
+                div()
+                    .id("clear-search-btn")
+                    .px(space::XXS)
+                    .text_size(text::CAPTION)
+                    .text_color(theme.secondary)
+                    .hover(|style| style.text_color(theme.bright))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.clear_filter();
+                        window.focus(&this.focus, cx);
+                        cx.notify();
+                    }))
+                    .child("✕"),
+            )
+        })
 }
 
 fn short_name(path: &std::path::Path) -> String {
@@ -3159,7 +3634,7 @@ fn node_card(
                         .min_w_0()
                         .font_weight(FontWeight::SEMIBOLD)
                         .text_color(theme.bright)
-                        .child(node.name.to_string()),
+                        .child(crate::bidi::fix_rtl(&node.name).into_owned()),
                 ),
         )
         .child(
@@ -3284,6 +3759,7 @@ fn help_overlay(app: &Disktree, cx: &gpui_kit::App) -> Div {
         ),
         ("c", "Review the marked list"),
         ("t", "Size, files or age: what areas and colours say"),
+        ("f", "Switch between Worth a look and Largest files"),
         ("r", "Scan again from the same root"),
         ("esc", "Stop a scan in progress"),
         ("v", "Scan another volume"),
@@ -3389,5 +3865,200 @@ fn help_overlay(app: &Disktree, cx: &gpui_kit::App) -> Div {
                             app.options.metric.label()
                         )),
                 ),
+        )
+}
+
+/// A context menu opened by right-clicking a tile in the treemap.
+fn context_menu(
+    app: &Disktree,
+    window: &Window,
+    cx: &Context<'_, Disktree>,
+) -> Option<impl IntoElement> {
+    let menu = app.context_menu.as_ref()?;
+    let crumbs = &menu.crumbs;
+    let node = app.node_at(crumbs)?;
+    let theme = cx.omarchy().clone();
+    let is_dir = node.is_dir();
+    let path = app.path_at(crumbs);
+    let is_marked =
+        path.as_deref().is_some_and(|path| app.marks.contains(path));
+
+    let rem = window.rem_size().as_f32();
+    let width = 16.0 * rem;
+    let estimated_height = (if is_dir { 10.5 } else { 9.0 }) * rem;
+    let window_size = window.bounds().size;
+
+    let x = if menu.position.x.as_f32() + width
+        > window_size.width.as_f32() - 8.0
+    {
+        (menu.position.x.as_f32() - width).max(8.0)
+    } else {
+        menu.position.x.as_f32()
+    };
+    let y = if menu.position.y.as_f32() + estimated_height
+        > window_size.height.as_f32() - 8.0
+    {
+        (menu.position.y.as_f32() - estimated_height).max(8.0)
+    } else {
+        menu.position.y.as_f32()
+    };
+
+    let target_crumbs = crumbs.clone();
+    let display_name = crate::bidi::fix_rtl(&node.name).into_owned();
+
+    let mut panel = div()
+        .id("context-menu-panel")
+        .debug_selector(|| "context-menu-panel".into())
+        .occlude()
+        .flex()
+        .flex_col()
+        .gap(space::XXS)
+        .w(px(width))
+        .p(space::XXS)
+        .bg(theme.surface)
+        .border_1()
+        .border_color(theme.control_border())
+        .shadow_lg()
+        .on_mouse_down_out(cx.listener(|this, _, _, cx| {
+            this.context_menu = None;
+            cx.notify();
+        }))
+        .child(
+            div()
+                .px(space::XS)
+                .py(space::XXS)
+                .font_weight(FontWeight::BOLD)
+                .text_color(theme.bright)
+                .text_size(text::CAPTION)
+                .child(display_name),
+        );
+
+    panel = panel.child(context_menu_item(
+        "cm-open-explorer",
+        "Open in File Explorer",
+        "O",
+        gpui_omarchy::IconName::FolderOpen,
+        &theme,
+        cx.listener(|this, _, _, cx| {
+            this.context_menu = None;
+            this.reveal_target(cx);
+        }),
+    ));
+
+    if is_dir {
+        panel = panel.child(context_menu_item(
+            "cm-open-dir",
+            "Open Directory",
+            "Enter",
+            gpui_omarchy::IconName::FolderOpen,
+            &theme,
+            cx.listener(|this, _, _, cx| {
+                this.context_menu = None;
+                this.descend(cx);
+            }),
+        ));
+    }
+
+    let delete_crumbs = target_crumbs.clone();
+    panel = panel.child(context_menu_item(
+        "cm-delete",
+        "Delete…",
+        "Del",
+        gpui_omarchy::IconName::X,
+        &theme,
+        cx.listener(move |this, _, window, cx| {
+            this.context_menu = None;
+            this.prompt_delete(&delete_crumbs, cx);
+            this.apply_focus(window, cx);
+        }),
+    ));
+
+    let mark_crumbs = target_crumbs;
+    let mark_label = if is_marked { "Unmark" } else { "Mark (Select)" };
+    panel = panel.child(context_menu_item(
+        "cm-mark",
+        mark_label,
+        "Space",
+        gpui_omarchy::IconName::Check,
+        &theme,
+        cx.listener(move |this, _, _, cx| {
+            this.context_menu = None;
+            this.toggle_mark(&mark_crumbs, cx);
+        }),
+    ));
+
+    if let Some(p) = path {
+        let path_str = p.to_string_lossy().to_string();
+        panel = panel.child(context_menu_item(
+            "cm-copy-path",
+            "Copy Path",
+            "Ctrl+C",
+            gpui_omarchy::IconName::File,
+            &theme,
+            cx.listener(move |this, _, _, cx| {
+                this.context_menu = None;
+                cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(
+                    path_str.clone(),
+                ));
+                this.notice =
+                    Some(("Path copied to clipboard".into(), Status::Success));
+                cx.notify();
+            }),
+        ));
+    }
+
+    panel = panel.child(context_menu_item(
+        "cm-switch-volume",
+        "Switch Drive",
+        "V",
+        gpui_omarchy::IconName::Search,
+        &theme,
+        cx.listener(|this, _, _, cx| {
+            this.context_menu = None;
+            this.open_volumes(cx);
+        }),
+    ));
+
+    Some(div().absolute().left(px(x)).top(px(y)).child(panel))
+}
+
+fn context_menu_item(
+    id: &'static str,
+    label: &'static str,
+    key_hint: &'static str,
+    icon: gpui_omarchy::IconName,
+    theme: &gpui_omarchy::Theme,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> Stateful<Div> {
+    div()
+        .id(ElementId::Name(id.into()))
+        .flex()
+        .flex_row()
+        .items_center()
+        .justify_between()
+        .px(space::XS)
+        .py(space::XXS)
+        .cursor_pointer()
+        .rounded_sm()
+        .hover(|style| style.bg(theme.hover_fill()))
+        .on_click(on_click)
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(space::XS)
+                .child(
+                    gpui_omarchy::icon(icon)
+                        .size(icon::SM)
+                        .text_color(theme.secondary),
+                )
+                .child(label),
+        )
+        .child(
+            div()
+                .text_color(theme.secondary.opacity(0.6))
+                .text_size(text::CAPTION)
+                .child(key_hint),
         )
 }

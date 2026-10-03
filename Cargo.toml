@@ -3,11 +3,12 @@ resolver = "3"
 members = ["crates/disktree-app", "crates/disktree-core", "xtask"]
 
 [workspace.package]
-version = "0.10.1"
+version = "0.10.4"
 edition = "2024"
 rust-version = "1.97"
 license = "MIT"
-repository = "https://github.com/tobi/disktree"
+authors = ["Yaser Hasan <dev.yaserhasan@gmail.com>"]
+repository = "https://github.com/ing-yaserhasan/disktree"
 
 [workspace.dependencies]
 disktree-core = { path = "crates/disktree-core" }

@@ -12,7 +12,10 @@ use std::time::{Duration, Instant};
 
 use disktree_core::access::file_table_readable;
 use disktree_core::filter::{Keep, Matches, filter};
-use disktree_core::insights::{Candidate, worth_a_look};
+use disktree_core::insights::{
+    Candidate, DuplicateGroup, LargestFile, duplicate_files, largest_files,
+    worth_a_look,
+};
 use disktree_core::removal::{
     Plan, RemovalEvent, RemovalHandle, RemovalMode, Target, TrashBackend,
     detect_trash_backend, plan,
@@ -27,8 +30,8 @@ use disktree_core::treemap::{
 };
 use gpui_kit::{
     Context, FocusHandle, KeyDownEvent, MouseButton, MouseDownEvent,
-    MouseMoveEvent, NavigationDirection, Pixels, Point, Render, ScrollDelta,
-    ScrollWheelEvent, Size, Window, px, size,
+    MouseMoveEvent, MouseUpEvent, NavigationDirection, Pixels, Point, Render,
+    ScrollDelta, ScrollWheelEvent, Size, Window, px, size,
 };
 use gpui_omarchy::Status;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -57,6 +60,13 @@ pub struct CrumbMenu {
     pub current: usize,
     /// The row the arrow keys are on, as an index into [`Disktree::siblings`].
     pub highlighted: usize,
+}
+
+/// Position and target of an open treemap right-click context menu.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ContextMenuState {
+    pub position: Point<Pixels>,
+    pub crumbs: Vec<usize>,
 }
 
 /// One row of a sibling menu.
@@ -101,6 +111,22 @@ pub fn panel_width(pointer_x: f32, viewport: f32, rem: f32) -> f32 {
 
 /// How many "worth a look" findings the panel lists.
 const INSIGHT_LIMIT: usize = 6;
+
+/// How many largest files the panel lists.
+const TOP_FILES_LIMIT: usize = 10;
+const DUPLICATES_LIMIT: usize = 50;
+
+/// Which list the side panel displays above the marked list.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SideListTab {
+    /// The biggest things worth clearing (reclaimable caches, worktrees, etc.).
+    #[default]
+    Worth,
+    /// The largest individual files.
+    Files,
+    /// Duplicate files in the tree.
+    Duplicates,
+}
 
 /// Which screen the app is showing.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -364,6 +390,9 @@ pub struct Disktree {
     /// The permanent-deletion alert dialog is open. Trash needs no dialog: it
     /// is reversible, so it commits directly.
     pub confirm_open: bool,
+    /// When deleting directly from an item or key, track the single target
+    /// so cancelling cleans up the mark.
+    pub single_delete_target: Option<PathBuf>,
     /// Focus owner for the alert dialog while it is open.
     pub confirm_focus: FocusHandle,
     /// Focus to move on the next occasion a window is in hand. Key handling
@@ -404,10 +433,23 @@ pub struct Disktree {
     pub focus: FocusHandle,
     /// A trail crumb's sibling menu, when open.
     pub crumb_menu: Option<CrumbMenu>,
+    /// Active right-click context menu on the treemap.
+    pub context_menu: Option<ContextMenuState>,
+    /// Drag-to-pan: where the pointer was when panning started,
+    /// and the view origin at that moment.
+    pan_start: Option<(f32, f32, f32, f32)>,
+    /// Whether a drag-to-pan operation is active.
+    pub is_panning: bool,
 
     pub color_mode: ColorMode,
+    /// Which list tab is active in the side panel.
+    pub side_tab: SideListTab,
     /// The largest things worth clearing, recomputed when a scan lands.
     pub insights: Vec<Candidate>,
+    /// The largest individual files, recomputed when a scan lands.
+    pub top_files: Vec<LargestFile>,
+    /// Duplicate files in the scanned tree.
+    pub duplicate_files: Vec<DuplicateGroup>,
     /// What git knows about each checkout that has been selected; `None`
     /// once asked and found not to be one.
     pub git: FxHashMap<PathBuf, Option<GitState>>,
@@ -494,6 +536,7 @@ impl Disktree {
             },
             trash_backend,
             confirm_open: false,
+            single_delete_target: None,
             confirm_focus: cx.focus_handle(),
             focus_request: None,
             window_title: String::new(),
@@ -517,8 +560,14 @@ impl Disktree {
             show_selection: true,
             focus: cx.focus_handle(),
             crumb_menu: None,
+            context_menu: None,
+            pan_start: None,
+            is_panning: false,
             color_mode: ColorMode::Kind,
+            side_tab: SideListTab::Worth,
             insights: Vec::new(),
+            top_files: Vec::new(),
+            duplicate_files: Vec::new(),
             git: FxHashMap::default(),
             git_pending: FxHashSet::default(),
             device: None,
@@ -657,7 +706,6 @@ impl Disktree {
                     space: space_info(&root).ok(),
                 });
             }
-            volumes.retain(|volume| volume.point != root_path);
             volumes
         });
         cx.spawn(async move |this, cx| {
@@ -737,12 +785,25 @@ impl Disktree {
         }
     }
 
-    /// Recompute "worth a look" from the tree on screen.
+    /// Recompute "worth a look", largest files, and duplicate files.
     fn refresh_insights(&mut self) {
         self.scanned_at = now_seconds();
         self.insights = self.tree.as_deref().map_or_else(Vec::new, |tree| {
             worth_a_look(tree, self.scanned_at, INSIGHT_LIMIT)
         });
+        self.top_files = self
+            .tree
+            .as_deref()
+            .map_or_else(Vec::new, |tree| largest_files(tree, TOP_FILES_LIMIT));
+        self.duplicate_files =
+            self.tree.as_deref().map_or_else(Vec::new, |tree| {
+                duplicate_files(tree, DUPLICATES_LIMIT)
+            });
+    }
+
+    /// Whether the treemap is currently being dragged to pan.
+    pub const fn is_panning(&self) -> bool {
+        self.is_panning
     }
 
     /// Ask git about `path` once, off the UI thread, if it is a checkout.
@@ -1010,7 +1071,10 @@ impl Disktree {
                 break;
             };
             crumbs.push(index);
-            trail.push((node.name.to_string(), Crumb::Tree(crumbs.clone())));
+            trail.push((
+                crate::bidi::fix_rtl(&node.name).into_owned(),
+                Crumb::Tree(crumbs.clone()),
+            ));
         }
         trail
     }
@@ -1028,7 +1092,7 @@ impl Disktree {
             .enumerate()
             .map(|(index, child)| Sibling {
                 index,
-                name: child.name.to_string(),
+                name: crate::bidi::fix_rtl(&child.name).into_owned(),
                 value: child.value(metric),
                 category: child.category,
                 is_dir: child.is_dir(),
@@ -2008,9 +2072,32 @@ impl Disktree {
         }
     }
 
+    /// Prompt immediate deletion of an item or selection:
+    /// marks it and opens the delete confirmation dialog.
+    pub fn prompt_delete(
+        &mut self,
+        crumbs: &[usize],
+        cx: &mut Context<'_, Self>,
+    ) {
+        let Some(path) = self.path_at(crumbs) else {
+            return;
+        };
+        if self.marks.contains(&path) {
+            self.single_delete_target = None;
+        } else {
+            self.marks.clear();
+            self.single_delete_target = Some(path);
+            self.toggle_mark(crumbs, cx);
+        }
+        self.confirm_open = true;
+        self.focus_request = Some(FocusTarget::Dialog);
+        cx.notify();
+    }
+
     /// The alert dialog's `Delete`.
     pub fn confirm_delete(&mut self, cx: &mut Context<'_, Self>) {
         self.confirm_open = false;
+        self.single_delete_target = None;
         self.focus_request = Some(FocusTarget::Root);
         self.begin_removal(cx);
     }
@@ -2018,6 +2105,9 @@ impl Disktree {
     /// The alert dialog's `Cancel`, or Escape.
     pub fn cancel_delete(&mut self, cx: &mut Context<'_, Self>) {
         self.confirm_open = false;
+        if let Some(target) = self.single_delete_target.take() {
+            self.unmark(&target, cx);
+        }
         self.focus_request = Some(FocusTarget::Root);
         cx.notify();
     }
@@ -2446,6 +2536,15 @@ impl Disktree {
             return;
         }
 
+        if self.context_menu.is_some() {
+            if key == "escape" {
+                self.context_menu = None;
+                cx.notify();
+                return;
+            }
+            self.context_menu = None;
+        }
+
         if self.crumb_menu.is_some() && self.on_menu_key(key, cx) {
             return;
         }
@@ -2530,6 +2629,7 @@ impl Disktree {
                 | "x"
                 | "enter"
                 | "tab"
+                | "delete"
                 | "left"
                 | "right"
                 | "up"
@@ -2571,6 +2671,11 @@ impl Disktree {
             }
             "space" => self.toggle_mark_selected(cx),
             "x" if !control => self.toggle_mark_selected(cx),
+            "delete" => {
+                if let Some(selected) = self.selected.clone() {
+                    self.prompt_delete(&selected, cx);
+                }
+            }
             "tab" => self.cycle_sibling(if shift { -1 } else { 1 }, cx),
             "c" if !control => {
                 if self.marks.is_empty() {
@@ -2607,6 +2712,14 @@ impl Disktree {
             "0" => self.reset_view(cx),
             "t" if !control => {
                 self.set_mode((self.mode_index() + 1) % 3, cx);
+            }
+            "f" if !control => {
+                self.side_tab = match self.side_tab {
+                    SideListTab::Worth => SideListTab::Files,
+                    SideListTab::Files => SideListTab::Duplicates,
+                    SideListTab::Duplicates => SideListTab::Worth,
+                };
+                cx.notify();
             }
             "r" if !control => self.start_scan(cx),
             "g" if !control => self.go_to_disk(cx),
@@ -2678,6 +2791,24 @@ impl Disktree {
             event.position.x - origin.x,
             event.position.y - origin.y,
         );
+
+        // While a pan drag is active, move the view origin.
+        if let Some((start_x, start_y, ox, oy)) = self.pan_start {
+            let dx = (local.x.as_f32() - start_x) / self.view.scale;
+            let dy = (local.y.as_f32() - start_y) / self.view.scale;
+            if self.view.scale > 1.0
+                && (dx.abs() > 2.0 || dy.abs() > 2.0 || self.is_panning)
+            {
+                self.is_panning = true;
+                let area = self.treemap_size.get();
+                self.view.origin_x = ox - dx;
+                self.view.origin_y = oy - dy;
+                self.view = self.view.clamped(area);
+                cx.notify();
+                return;
+            }
+        }
+
         // Moves are delivered here even when the pointer is elsewhere in the
         // window. Outside the mosaic there is nothing to hover, and a stale
         // tooltip would cover whatever the pointer went to — the panel's
@@ -2708,7 +2839,11 @@ impl Disktree {
     pub fn on_mouse_leave(&mut self, cx: &mut Context<'_, Self>) {
         self.pointer = None;
         self.pointer_active = false;
-        if self.hovered.take().is_some() {
+        let changed = self.hovered.take().is_some()
+            || self.pan_start.take().is_some()
+            || self.is_panning;
+        self.is_panning = false;
+        if changed {
             cx.notify();
         }
     }
@@ -2723,9 +2858,19 @@ impl Disktree {
         let x = (event.position.x - origin.x).as_f32();
         let y = (event.position.y - origin.y).as_f32();
         let crumbs = self.tile_at(x, y);
-
         match event.button {
+            MouseButton::Right => {
+                if let Some(crumbs) = crumbs {
+                    self.select(Some(crumbs.clone()), cx);
+                    self.context_menu = Some(ContextMenuState {
+                        position: event.position,
+                        crumbs,
+                    });
+                    cx.notify();
+                }
+            }
             MouseButton::Left if event.click_count >= 2 => {
+                self.context_menu = None;
                 if let Some(crumbs) = crumbs {
                     self.select(Some(crumbs), cx);
                     self.descend(cx);
@@ -2734,11 +2879,15 @@ impl Disktree {
             MouseButton::Left
                 if event.modifiers.control || event.modifiers.platform =>
             {
+                self.context_menu = None;
                 if let Some(crumbs) = crumbs {
                     self.toggle_mark(&crumbs, cx);
                 }
             }
             MouseButton::Left => {
+                self.context_menu = None;
+                self.pan_start =
+                    Some((x, y, self.view.origin_x, self.view.origin_y));
                 let activate = crumbs.as_ref().is_some_and(|crumbs| {
                     self.selected.as_ref() == Some(crumbs)
                         && self.node_at(crumbs).is_some_and(Node::is_dir)
@@ -2752,9 +2901,10 @@ impl Disktree {
                 self.select(crumbs, cx);
             }
             MouseButton::Middle => {
-                if let Some(crumbs) = crumbs {
-                    self.toggle_mark(&crumbs, cx);
-                }
+                // Middle-click starts a pan drag.
+                self.context_menu = None;
+                self.pan_start =
+                    Some((x, y, self.view.origin_x, self.view.origin_y));
             }
             // Buttons 8 and 9. gpui-pre maps them on X11, Wayland and
             // Windows; a mouse with no side buttons never sends them, and
@@ -2769,7 +2919,19 @@ impl Disktree {
             {
                 self.go_forward(cx);
             }
-            _ => {}
+            MouseButton::Navigate(_) => {}
+        }
+    }
+
+    /// Release: stop panning if a drag was active.
+    pub fn on_mouse_up(
+        &mut self,
+        _event: &MouseUpEvent,
+        cx: &mut Context<'_, Self>,
+    ) {
+        if self.pan_start.take().is_some() || self.is_panning {
+            self.is_panning = false;
+            cx.notify();
         }
     }
 
@@ -2908,10 +3070,11 @@ const HEADER_INNER_REMS: f32 = 1.0;
 
 /// A trail step's label: the directory's own name, or `/` for the root.
 fn crumb_label(path: &Path) -> String {
-    path.file_name().map_or_else(
+    let raw = path.file_name().map_or_else(
         || path.display().to_string(),
         |name| name.to_string_lossy().into_owned(),
-    )
+    );
+    crate::bidi::fix_rtl(&raw).into_owned()
 }
 
 impl Disktree {
@@ -3042,7 +3205,7 @@ impl Render for Disktree {
         // The titlebar names the directory on screen, however it got there:
         // a key, a click, a rescan or a folder chosen from the menu.
         let title = format!(
-            "disktree · {}",
+            "disktree (Yaser Edition) · {}",
             crate::marks::display_path(
                 &self.current_path(),
                 self.home.as_deref()

@@ -13,6 +13,7 @@
 
 mod app_menu;
 mod appearance;
+pub(crate) mod bidi;
 mod git;
 mod marks;
 mod palette;

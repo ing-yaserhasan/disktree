@@ -1,1 +1,4 @@
 /target
+disktree.exe
+*.zip
+dist*/

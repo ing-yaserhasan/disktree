@@ -1,409 +1,619 @@
-# disktree
+﻿# disktree
 
-![disktree: a home directory as a treemap, coloured by kind of data, with reclaimable space hatched and the selection, findings and free space in the side panel](assets/screenshot.png)
+<div align="center">
 
-Find what is filling a disk, mark what should go, and remove it — with the
-volume's free space in view the whole time.
+[![Release](https://img.shields.io/github/v/release/ing-yaserhasan/disktree?style=for-the-badge&color=3b82f6)](https://github.com/ing-yaserhasan/disktree/releases/latest)
+[![Build & CI](https://img.shields.io/github/actions/workflow/status/ing-yaserhasan/disktree/ci.yml?branch=main&style=for-the-badge&label=Build%20%26%20CI)](https://github.com/ing-yaserhasan/disktree/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-10b981.svg?style=for-the-badge)](LICENSE)
+[![Platforms](https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-f59e0b?style=for-the-badge)](https://github.com/ing-yaserhasan/disktree/releases/latest)
+[![Rust](https://img.shields.io/badge/Rust-1.97+-black?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
+[![GUI](https://img.shields.io/badge/GUI-GPUI-8b5cf6?style=for-the-badge)](https://gpui-kit.com/)
 
-disktree is a treemap for Omarchy. It scans your home directory by default,
-draws every directory as a nested mosaic sized by what it really costs on disk,
-and lets you walk into it with the keyboard or the mouse. Mark as much as you
-like; nothing happens until you review the list and commit, and the permanent
-path always asks first.
+<br/>
 
-Built with [GPUI](https://gpui-kit.com/) through
-[gpui-omarchy](https://github.com/huacnlee/gpui-omarchy), so it follows your
-Omarchy theme and behaves like the rest of the desktop.
+**[English](#english)** • **[Deutsch](#deutsch)** • **[العربية](#العربية)** • **[日本語](#日本語)** • **[简体中文](#简体中文)** • **[Français](#français)** • **[Türkçe](#türkçe)** • **[Español](#español)** • **[Русский](#русский)** • **[Українська](#українська)**
 
-## Install
+</div>
 
-Download `disktree-*-x86_64-linux.tar.gz` (`aarch64-linux` on ARM) from the
-[latest release](https://github.com/tobi/disktree/releases/latest), unpack
-it, and run `./install.sh` inside (or just copy `disktree` onto your
-`PATH`). Or build it:
+---
 
+![disktree screenshot](assets/screenshot.png)
+
+---
+
+## ⚡ Direct Downloads / Sofort-Downloads (v0.10.4)
+
+| Operating System / Betriebssystem | Architecture / Architektur | Format | Direct Download / Direktdownload |
+| :--- | :--- | :--- | :--- |
+| **🪟 Windows** | **x86_64 (Intel / AMD 64-bit)** | Portable `.zip` (Ready to run) | [📥 **Download Windows x64**](https://github.com/ing-yaserhasan/disktree/releases/download/v0.10.4/disktree-0.10.4-x86_64-windows.zip) |
+| **🪟 Windows** | **ARM64** | Portable `.zip` | [📥 **Download Windows ARM64**](https://github.com/ing-yaserhasan/disktree/releases/download/v0.10.4/disktree-0.10.4-aarch64-windows.zip) |
+| **🍏 macOS** | **Apple Silicon (M1 / M2 / M3 / M4)** | `.zip` (`disktree.app`) | [📥 **Download macOS Apple Silicon**](https://github.com/ing-yaserhasan/disktree/releases/download/v0.10.4/disktree-0.10.4-aarch64-macos.zip) |
+| **🍏 macOS** | **Intel (x86_64)** | `.zip` (`disktree.app`) | [📥 **Download macOS Intel**](https://github.com/ing-yaserhasan/disktree/releases/download/v0.10.4/disktree-0.10.4-x86_64-macos.zip) |
+| **🐧 Linux** | **x86_64** | `.tar.gz` (Binary + Installer) | [📥 **Download Linux x86_64**](https://github.com/ing-yaserhasan/disktree/releases/download/v0.10.4/disktree-0.10.4-x86_64-linux.tar.gz) |
+| **🐧 Linux** | **ARM64 (aarch64)** | `.tar.gz` (Binary + Installer) | [📥 **Download Linux ARM64**](https://github.com/ing-yaserhasan/disktree/releases/download/v0.10.4/disktree-0.10.4-aarch64-linux.tar.gz) |
+
+> 💡 All releases and verification checksums are available on the [GitHub Releases Page](https://github.com/ing-yaserhasan/disktree/releases/latest).
+
+---
+
+# English
+
+**disktree** is a blazing-fast, modern disk usage visualizer and cleaner built with **Rust** and **GPUI**. It represents your disk space as an interactive, squarified treemap mosaic colored by data type, allowing you to instantly locate giant folders, mark unneeded files, and reclaim storage safely with real-time free space projections.
+
+### 🌟 Key Highlights
+- 🔍 **Permanent Search Bar:** Always accessible at the top. Click to filter items by name with instant visual feedback and a quick clear (`✕`) button.
+- ⬆ **One-Click Parent Navigation:** Dedicated `▲` button to jump up through folder levels effortlessly.
+- 🗑 **Direct & Safe Deletion:** Delete items directly via sidebar button, right-click context menu, or the `Del` key, backed by smart confirmation dialogs (Recycle Bin vs. Permanent).
+- ⚡ **Extreme Performance:** Scans millions of files in seconds. On Windows, reads directly from the NTFS Master File Table (MFT) when elevated.
+- 🎨 **Rich Visual Classification:** Color-coded by file kind (code, media, toolchains, caches, git artifacts, and documents).
+- 🛡️ **Guaranteed Safety:** Never deletes system directories, profile roots, or mount points. Deletions are strictly contained within scanned boundaries.
+
+### Installation & Quick Start
+
+#### Windows
+Download `disktree-*-x86_64-windows.zip`, extract it anywhere, and double-click `disktree.exe`. No installation required!
+- Statically linked C runtime (`+crt-static`) guarantees seamless execution on any Windows 10/11 machine without extra runtime dependencies.
+- Run as Administrator for instant MFT-accelerated disk scanning.
+
+#### macOS
+Download the appropriate `.zip` for your architecture (Apple Silicon or Intel), unzip, and drag `disktree.app` into your Applications folder.
+- If Gatekeeper flags the application on first launch, run:
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- Grant **Full Disk Access** in *System Settings › Privacy & Security* to allow scanning user caches and protected app data.
+
+#### Linux
+Download `disktree-*-linux.tar.gz`, extract it, and execute:
 ```sh
-git clone https://github.com/tobi/disktree
-cd disktree
-make install
+./install.sh
 ```
-
-`make install` builds a release binary and puts three things under `~/.local`
-(no root needed):
-
-- `~/.local/bin/disktree`
-- a desktop entry, so disktree is in the launcher and in a file manager's
-  **Open with** for a directory (it adds a handler; it never becomes the
-  default)
-- an icon
-
-`sudo make install PREFIX=/usr/local` installs system-wide; `make uninstall`
-removes exactly what was installed.
-
-On Arch, including Omarchy, disktree is in the AUR:
-[`disktree`](https://aur.archlinux.org/packages/disktree) builds each release
-from source, and
-[`disktree-bin`](https://aur.archlinux.org/packages/disktree-bin) installs
-the release binary:
-
+Or install directly from the Arch Linux AUR:
 ```sh
 yay -S disktree-bin
 ```
 
-You need Rust 1.97 or newer and a Wayland or X11 session with a GPU that GPUI
-can drive (Vulkan). Distributions often package an older Rust;
-[rustup](https://rustup.rs) installs a current one. The repo pins 1.97 in
-`rust-toolchain.toml`, so with rustup the right toolchain is fetched on the
-first build even if `rustup default` points at something older.
+### Keyboard Shortcuts
 
-### macOS
+| Shortcut | Description |
+| :--- | :--- |
+| `Space` / `X` | Mark or unmark the focused item for review |
+| `Del` | Delete selected item with confirmation |
+| `Enter` | Enter directory / zoom into folder |
+| `Backspace` / `Esc` | Navigate up one directory level |
+| `Alt ←` / `Alt →` | History back / forward |
+| `Tab` | Select next largest sibling |
+| `/` | Focus search bar |
+| `Scroll Wheel` | Fluid zoom into folders |
+| `C` | Open Review & Commit removal screen |
+| `R` / `F5` | Rescan directory |
+| `V` | Switch between mounted drives / volumes |
+| `Q` | Quit application |
 
-Download `disktree-*-aarch64-macos.zip` (`x86_64-macos` for an Intel Mac)
-from the [latest release](https://github.com/tobi/disktree/releases/latest),
-unzip it, and drag `disktree.app` into Applications. macOS 11 or newer.
+---
 
-A release that was not signed and notarized is stopped by Gatekeeper: macOS
-says it "is damaged and can't be opened" or "cannot be verified". The app is
-fine; the browser marked the download as quarantined. Clear the mark once:
+# Deutsch
+
+**disktree** ist ein extrem schneller, moderner Speicherplatz-Visualisierer und Cleaner, entwickelt in **Rust** und **GPUI**. Es stellt Ihren Festplattenspeicher als interaktives Treemap-Mosaik dar, farblich nach Dateitypen kategorisiert. So finden Sie riesige Ordner im Handumdrehen, markieren überflüssige Daten und gewinnen Speicherplatz sicher und mit Live-Vorschau zurück.
+
+### 🌟 Wichtigste Funktionen
+- 🔍 **Permanente Suchleiste:** Immer oben sichtbar. Sofortiges Filtern von Dateien und Ordnern bei der Eingabe mit Schnell-Löschbutton (`✕`).
+- ⬆ **Einfache Ordner-Navigation:** Eigener `▲`-Button für den schnellen Wechsel in den übergeordneten Ordner.
+- 🗑 **Direktes & sicheres Löschen:** Löschen direkt über die Seitenleiste, das Kontextmenü oder die `Entf`-Taste mit differenziertem Bestätigungsdialog (Papierkorb vs. unwiderrufliches Löschen).
+- ⚡ **Herausragende Geschwindigkeit:** Scannt Millionen von Dateien in Sekunden. Unter Windows nutzt es mit Administratorrechten das NTFS Master File Table (MFT) für maximale Performance.
+- 🎨 **Intelligente Farbkodierung:** Automatische Erkennung und Farbgebung nach Datentypen (Quellcode, Medien, Caches, Toolchains, Git-Repositories, Dokumente).
+- 🛡️ **Integrierter Schutz:** Systemordner, Benutzerprofile und Einhängepunkte werden zuverlässig vor versehentlichem Löschen geschützt.
+
+### Installation & Schnellstart
+
+#### Windows
+Laden Sie `disktree-*-x86_64-windows.zip` herunter, entpacken Sie das Archiv an einem beliebigen Ort und starten Sie `disktree.exe`. Keine Installation erforderlich (Portable Version)!
+- Statisch gelinkte C-Runtime (`+crt-static`) stellt sicher, dass die Anwendung auf jedem Windows 10/11-System ohne zusätzliche DLLs sofort läuft.
+- Starten Sie als Administrator für MFT-beschleunigte Scans kompletter Laufwerke.
+
+#### macOS
+Laden Sie die passende `.zip`-Datei für Ihren Mac herunter (Apple Silicon oder Intel), entpacken Sie diese und ziehen Sie `disktree.app` in den Ordner *Programme*.
+- Sollte macOS beim ersten Öffnen eine Warnmeldung anzeigen, führen Sie im Terminal aus:
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- Erteilen Sie **Festplattenvollzugriff** in den *Systemeinstellungen › Datenschutz & Sicherheit*, um alle Systembereiche und Caches vollständig analysieren zu können.
+
+#### Linux
+Laden Sie `disktree-*-linux.tar.gz` herunter, entpacken Sie das Archiv und führen Sie folgendes Skript aus:
+```sh
+./install.sh
+```
+Auf Arch Linux kann disktree direkt aus dem AUR installiert werden:
+```sh
+yay -S disktree-bin
+```
+
+### Tastenkombinationen (Shortcuts)
+
+| Taste | Funktion |
+| :--- | :--- |
+| `Leertaste` / `X` | Element zur Überprüfung markieren / Markierung aufheben |
+| `Entf` (`Del`) | Ausgewähltes Element direkt löschen (mit Bestätigung) |
+| `Eingabe` (`Enter`) | Ordner öffnen / hineinzoomen |
+| `Rücktaste` (`Backspace`) / `Esc` | Eine Verzeichnisebene nach oben |
+| `Alt ←` / `Alt →` | Verlauf zurück / vorwärts |
+| `Tab` | Nächstgrößeres Element auswählen |
+| `/` | Suchleiste fokussieren |
+| `Mausrad` | Stufenloses Hinein- und Herauszoomen |
+| `C` | Überprüfungs- und Löschbildschirm öffnen |
+| `R` / `F5` | Erneut scannen (Aktualisieren) |
+| `V` | Zwischen gemounteten Laufwerken / Volumes wechseln |
+| `Q` | Anwendung beenden |
+
+---
+
+# العربية
+
+**disktree** هو متصفح ومنظف مساحة تخزين فائق السرعة وحديث مبني بلغة **Rust** وواجهة **GPUI**. يعرض مساحة القرص كمخطط شجري تفاعلي (Treemap) ملون بذكاء حسب نوع البيانات، مما يساعدك على كشف المجلدات الضخمة فوراً، وتحديد الملفات غير الضرورية، واستعادة مساحة التخزين بأمان تام مع عرض فوري لحجم المساحة المسترجعة.
+
+### 🌟 المميزات الرئيسية
+- 🔍 **شريط بحث دائم:** مدمج دائماً في أعلى النافذة للتصفية والبحث الفوري أثناء الكتابة مع زر مسح سريع (`✕`).
+- ⬆ **زر الصعود للأعلى:** زر تنقل مخصص (`▲`) للصعود المباشر إلى المجلد الأب بسهولة.
+- 🗑 **حذف مباشر وآمن:** حذف فوري عبر زر اللوحة الجانبية، القائمة المنبثقة، أو زر `Del` مع تأكيد ذكي (سلة المحذوفات أو الحذف النهائي).
+- ⚡ **أداء فائق واستثنائي:** مسح ملايين الملفات خلال ثوانٍ معدودة. وعلى نظام Windows، يقرأ مباشرة من جدول ملفات النظام NTFS (MFT) عند التشغيل كمسؤول.
+- 🎨 **تصنيف بصري ملون:** تصنيف تلقائي حسب نوع الملفات (برمجيات، وسائط، حزم تطوير، كاش، سجلات Git، ومستندات).
+- 🛡️ **حماية قصوى:** حظر صارم للمساس بملفات النظام الأساسية أو جذور حسابات المستخدمين أو نقاط التثبيت الخارجية.
+
+### التثبيت والبدء السريع
+
+#### نظام Windows
+قم بتحميل ملف `disktree-*-x86_64-windows.zip`، وفك الضغط في أي مكان، وشغّل `disktree.exe` مباشرة. لا يتطلب أي تثبيت (نسخة محمولة بالكامل)!
+- تم ربط مكتبات C بربط ثابت (`+crt-static`) ليعمل على أي جهاز Windows 10/11 دون الحاجة لحزم تشغيل إضافية.
+- شغّله كمسؤول (Run as Administrator) لتفعيل قراءة MFT فائقة السرعة للأقراص الكاملة.
+
+#### نظام macOS
+قم بتحميل ملف `.zip` المناسب لمعمارية جهازك (Apple Silicon أو Intel)، وفك الضغط واسحب `disktree.app` إلى مجلد التطبيقات (Applications).
+- إذا ظهرت رسالة أمان عند التشغيل الأول، نفّذ الأمر التالي في Terminal:
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- امنح التطبيق **صلاحية الوصول الكامل للقرص (Full Disk Access)** من *System Settings › Privacy & Security* لتمكينه من فحص مجلدات الكاش ومساحات التطبيقات المحمية.
+
+#### نظام Linux
+قم بتحميل ملف `disktree-*-linux.tar.gz`، وفك الضغط ونفّذ السكريبت التالي:
+```sh
+./install.sh
+```
+أو ثبته مباشرة على توزيعة Arch Linux من خلال AUR:
+```sh
+yay -S disktree-bin
+```
+
+### اختصارات لوحة المفاتيح
+
+| الاختصار | الوظيفة |
+| :--- | :--- |
+| `المسافة` / `X` | تحديد أو إلغاء تحديد العنصر للمراجعة |
+| `Del` | حذف العنصر المحدد مباشرة (مع نافذة تأكيد) |
+| `Enter` | فتح المجلد / الدخول والتقريب في المجلد |
+| `Backspace` / `Esc` | الصعود مستوى واحد للأعلى |
+| `Alt ←` / `Alt →` | الانتقال في سجل التصفح للخلف / للأمام |
+| `Tab` | تحديد العنصر الأكبر التالي |
+| `/` | التركيز في شريط البحث |
+| `عجلة الفأرة` | التكبير والتصغير السلس داخل المجلدات |
+| `C` | فتح نافذة المراجعة وتأكيد الحذف |
+| `R` / `F5` | إعادة فحص ومسح المجلد |
+| `V` | التبديل بين الأقراص ووحدات التخزين المتصلة |
+| `Q` | إغلاق التطبيق |
+
+---
+
+# 日本語
+
+**disktree** は、**Rust** と **GPUI** で構築された超高速でモダンなディスク容量ビジュアライザー兼クリーナーです。ストレージをデータ型ごとに色分けされたインタラクティブなツリーマップとして視覚化し、大容量フォルダーを瞬時に特定して不要なデータを安全に削除し、空き容量を効率的に確保できます。
+
+### 🌟 主な機能
+- 🔍 **常時表示の検索バー:** ウィンドウ上部に常に固定表示。入力と同時にリアルタイムでファイルやフォルダーを絞り込み、クリアボタン（`✕`）で瞬時にリセット。
+- ⬆ **親フォルダーへの移動ボタン:** 専用の `▲` ボタンにより、上位ディレクトリへの移動がワンクリックで可能。
+- 🗑 **安全な直接削除:** サイドバー、コンテキストメニュー、または `Del` キーから直接削除可能。ごみ箱への移動と完全削除を区別する安全な確認ダイアログ付き。
+- ⚡ **圧倒的な高速スキャン:** 数百万のファイルを数秒でスキャン。Windowsでは管理者権限で実行することでNTFSマスターファイルテーブル（MFT）を直接高速読み取り。
+- 🎨 **インテリジェントな色分け:** ファイルの種類（ソースコード、メディア、開発ツール、キャッシュ、Gitリポジトリ、ドキュメント）を自動判別して視覚化。
+- 🛡️ **堅牢な安全性保護:** システムフォルダー、ユーザープロファイルのルート、マウントポイントの誤削除を完全に防止。
+
+### インストールとクイックスタート
+
+#### Windows
+`disktree-*-x86_64-windows.zip` をダウンロードし、任意の場所に解凍して `disktree.exe` を実行するだけです。インストーラー不要のポータブル版です！
+- Cランタイムが静的リンク（`+crt-static`）されているため、Visual C++ 再頒布可能パッケージが未インストールのWindows 10/11でも即座に動作します。
+- ドライブ全体をスキャンする場合は、管理者として実行することでMFT超高速読み込みが有効になります。
+
+#### macOS
+お使いの環境（Apple Silicon または Intel）に合った `.zip` をダウンロードし、解凍した `disktree.app` を「アプリケーション」フォルダーにドラッグ＆ドロップします。
+- 初回起動時にGatekeeper警告が表示された場合は、ターミナルで以下を実行してください：
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- システム領域やキャッシュを完全にスキャンするには、*システム設定 › プライバシーとセキュリティ* で **フルディスクアクセス** を付与してください。
+
+#### Linux
+`disktree-*-linux.tar.gz` をダウンロードして解凍し、次のコマンドを実行します：
+```sh
+./install.sh
+```
+Arch Linux では AUR から直接インストール可能です：
+```sh
+yay -S disktree-bin
+```
+
+### キーボードショートカット
+
+| キー | 動作 |
+| :--- | :--- |
+| `Space` / `X` | 選択中の要素にレビュー用マークを付ける / 解除 |
+| `Del` | 選択中の要素を直接削除（確認画面あり） |
+| `Enter` | フォルダーを開く / 内部へズームイン |
+| `Backspace` / `Esc` | 1つ上のフォルダー階層へ戻る |
+| `Alt ←` / `Alt →` | 履歴の戻る / 進む |
+| `Tab` | 次に大きい要素を選択 |
+| `/` | 検索バーにフォーカス |
+| `マウスホイール` | フォルダーのシームレスな拡大・縮小 |
+| `C` | マーク一覧の確認と削除実行画面を開く |
+| `R` / `F5` | 現在のディレクトリを再スキャン |
+| `V` | 接続されているドライブやボリュームの切り替え |
+| `Q` | アプリケーションを終了 |
+
+---
+
+# 简体中文
+
+**disktree** 是一款采用 **Rust** 与 **GPUI** 构建的高性能现代化磁盘空间可视化分析与清理工具。它将磁盘空间以按数据类型智能着色的交互式树状图（Treemap）呈现，让您能够一目了然地定位超大文件夹，标记无用文件，并通过实时可用空间预估安全地释放存储空间。
+
+### 🌟 核心特性
+- 🔍 **顶部常驻搜索栏:** 始终置于窗口顶端，输入即时高亮与过滤对应文件及文件夹，支持一键快速清除（`✕`）。
+- ⬆ **上一级目录导航:** 专属 `▲` 按钮，层级向上跳转更轻松直观。
+- 🗑 **直接且安全的删除:** 可直接通过侧边栏按钮、右键菜单或 `Del` 键发起删除，支持移至回收站或彻底删除的智能确认对话框。
+- ⚡ **极致扫描性能:** 数秒内遍历数百万个文件。在 Windows 上以管理员身份运行即可直接读取 NTFS 主文件表（MFT），享受飞一般的扫描体验。
+- 🎨 **智能色彩分类:** 自动识别并区分数据类别（代码、多媒体、工具链、系统缓存、Git 仓库、文档）。
+- 🛡️ **多重安全防护:** 严禁删除关键系统目录、用户主目录根路径及外部挂载点，避免任何误操作风险。
+
+### 安装与快速入门
+
+#### Windows
+下载 `disktree-*-x86_64-windows.zip`，解压到任意文件夹后双击 `disktree.exe` 即可使用。绿色便携，无需安装！
+- 采用静态 C 运行时链接（`+crt-static`），在任何未安装 Visual C++ 运行库的 Windows 10/11 系统上均可即开即用。
+- 右键选择“以管理员身份运行”可启用极速 MFT 磁盘全盘扫描。
+
+#### macOS
+根据您的 Mac 芯片架构（Apple Silicon 或 Intel）下载对应的 `.zip` 压缩包，解压后将 `disktree.app` 拖入“应用程序”文件夹。
+- 若首次打开时系统提示安全隔离警告，请在终端中执行：
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- 请在*系统设置 › 隐私与安全性*中授予 disktree **完全磁盘访问权限**，以便完整扫描受保护的应用缓存与用户数据。
+
+#### Linux
+下载 `disktree-*-linux.tar.gz` 解压后运行安装脚本：
+```sh
+./install.sh
+```
+Arch Linux 用户可直接通过 AUR 安装：
+```sh
+yay -S disktree-bin
+```
+
+### 快捷键指南
+
+| 快捷键 | 功能说明 |
+| :--- | :--- |
+| `空格` / `X` | 标记或取消标记当前选中项以供审核 |
+| `Del` | 直接删除选中项（弹出确认窗口） |
+| `回车` (`Enter`) | 进入该目录 / 缩放深入下级目录 |
+| `退格` (`Backspace`) / `Esc` | 返回上一级目录 |
+| `Alt ←` / `Alt →` | 历史记录后退 / 前进 |
+| `Tab` | 选择同级目录中下一个最大项目 |
+| `/` | 聚焦至搜索栏 |
+| `鼠标滚轮` | 平滑缩放进出文件夹 |
+| `C` | 打开标记列表审核与确认删除界面 |
+| `R` / `F5` | 重新扫描当前目录 |
+| `V` | 切换已挂载的硬盘或分区 |
+| `Q` | 退出程序 |
+
+---
+
+# Français
+
+**disktree** est un visualiseur et nettoyeur d'espace disque ultra-rapide et moderne conçu avec **Rust** et **GPUI**. Il modélise votre stockage sous la forme d'un treemap interactif coloré par type de données, vous permettant d'identifier immédiatement les répertoires volumineux, de marquer les fichiers inutiles et de récupérer de l'espace en toute sécurité avec une prévisualisation en direct.
+
+### 🌟 Fonctionnalités clés
+- 🔍 **Barre de recherche permanente :** Toujours accessible en haut de la fenêtre. Filtrez instantanément vos répertoires et fichiers avec bouton d'effacement rapide (`✕`).
+- ⬆ **Bouton dossier parent :** Bouton `▲` dédié pour remonter facilement dans l'arborescence des dossiers.
+- 🗑 **Suppression directe et sécurisée :** Action de suppression directe depuis le volet latéral, le menu contextuel ou la touche `Suppr`, accompagnée d'une boîte de dialogue intelligente (Corbeille ou définitif).
+- ⚡ **Performances fulgurantes :** Scanne des millions de fichiers en quelques secondes. Sous Windows, lit directement la table des fichiers NTFS (MFT) en mode administrateur.
+- 🎨 **Classification visuelle intelligente :** Couleurs distinctes selon le type de fichier (code source, médias, environnements, caches, Git, documents).
+- 🛡️ **Sécurité maximale :** Refus absolu de supprimer les répertoires système critiques, les dossiers racines utilisateurs ou les points de montage externes.
+
+### Installation et démarrage rapide
+
+#### Windows
+Téléchargez `disktree-*-x86_64-windows.zip`, décompressez l'archive dans le dossier de votre choix et lancez `disktree.exe`. Version portable, aucune installation requise !
+- Liaison statique de la bibliothèque C (`+crt-static`) garantissant un fonctionnement parfait sur Windows 10/11 sans dépendance DLL.
+- Exécutez en tant qu'administrateur pour profiter du scan accéléré par MFT sur vos disques complets.
+
+#### macOS
+Téléchargez l'archive `.zip` adaptée à votre machine (Apple Silicon ou Intel), décompressez-la et glissez `disktree.app` dans le dossier *Applications*.
+- Si Gatekeeper bloque le premier lancement, saisissez dans le Terminal :
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- Accordez l'**Accès complet au disque** dans *Réglages Système › Confidentialité et sécurité* pour analyser les caches système et données d'applications.
+
+#### Linux
+Téléchargez `disktree-*-linux.tar.gz`, décompressez l'archive et exécutez :
+```sh
+./install.sh
+```
+Sous Arch Linux, disktree est disponible sur AUR :
+```sh
+yay -S disktree-bin
+```
+
+### Raccourcis clavier
+
+| Raccourci | Action |
+| :--- | :--- |
+| `Espace` / `X` | Marquer ou démarquer l'élément pour examen |
+| `Suppr` (`Del`) | Supprimer directement l'élément sélectionné avec confirmation |
+| `Entrée` | Ouvrir le dossier / zoomer à l'intérieur |
+| `Retour arrière` / `Échap` | Remonter d'un niveau de répertoire |
+| `Alt ←` / `Alt →` | Historique précédent / suivant |
+| `Tab` | Sélectionner le frère suivant le plus volumineux |
+| `/` | Activer la barre de recherche |
+| `Molette souris` | Zoom fluide dans les dossiers |
+| `C` | Ouvrir la fenêtre d'examen et de suppression |
+| `R` / `F5` | Réanalyser le dossier courant |
+| `V` | Changer de disque ou de volume monté |
+| `Q` | Quitter l'application |
+
+---
+
+# Türkçe
+
+**disktree**, **Rust** ve **GPUI** kullanılarak geliştirilmiş, ışık hızında çalışan modern bir disk alanı görselleştirici ve temizleme aracıdır. Disk kullanımınızı veri türüne göre renklendirilmiş etkileşimli bir ağaç haritası (treemap) olarak sunar; dev klasörleri anında tespit etmenizi, gereksiz dosyaları işaretlemenizi ve gerçek zamanlı alan projeksiyonuyla güvenle depolama alanı kazanmanızı sağlar.
+
+### 🌟 Önemli Özellikler
+- 🔍 **Kalıcı Arama Çubuğu:** Pencerenin üst kısmında her zaman hazırdır. Yazdığınız anda dosyaları anlık olarak filtreler ve hızlı temizleme düğmesi (`✕`) içerir.
+- ⬆ **Üst Dizin Gezintisi:** Klasör katmanlarında kolayca yukarı çıkmak için özel `▲` gezinti butonu.
+- 🗑 **Doğrudan ve Güvenli Silme:** Yan panel, sağ tık menüsü veya `Del` tuşu ile doğrudan silme; Geri Dönüşüm Kutusu veya kalıcı silme seçenekli akıllı onay penceresi.
+- ⚡ **Üstün Performans:** Milyonlarca dosyayı saniyeler içinde tarar. Windows'ta yönetici olarak çalıştırıldığında NTFS Ana Dosya Tablosunu (MFT) doğrudan okur.
+- 🎨 **Akıllı Renklendirme:** Dosya türlerine göre otomatik renk ayrımı (kod, medya, araç zincirleri, önbellekler, Git depoları ve belgeler).
+- 🛡️ **Güvenlik Koruması:** Sistem dizinlerini, kullanıcı profili ana dizinlerini ve bağlama noktalarını silmeyi kesin olarak reddeder.
+
+### Kurulum ve Hızlı Başlangıç
+
+#### Windows
+`disktree-*-x86_64-windows.zip` dosyasını indirin, dilediğiniz bir klasöre çıkartın ve `disktree.exe` dosyasını çalıştırın. Kurulum gerektirmeyen taşınabilir (portable) sürümdür!
+- Statik C çalışma zamanı bağlantısı (`+crt-static`), herhangi bir Windows 10/11 cihazında harici DLL gerektirmeden sorunsuz çalışmasını sağlar.
+- Tüm sürücüyü taramak için yönetici olarak çalıştırarak MFT hızlandırmasını etkinleştirin.
+
+#### macOS
+Mimarinize uygun `.zip` dosyasını (Apple Silicon veya Intel) indirin, arşivi açın ve `disktree.app` dosyasını Uygulamalar (Applications) klasörüne sürükleyin.
+- Gatekeeper ilk açılışta uyarı verirse Terminal'de şu komutu çalıştırın:
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- Önbellekleri ve korumalı alanları eksiksiz tarayabilmek için *Sistem Ayarları › Gizlilik ve Güvenlik* bölümünden **Tam Disk Erişimi** izni verin.
+
+#### Linux
+`disktree-*-linux.tar.gz` dosyasını indirin, çıkartın ve şu betiği çalıştırın:
+```sh
+./install.sh
+```
+Arch Linux kullanıcıları AUR üzerinden doğrudan yükleyebilir:
+```sh
+yay -S disktree-bin
+```
+
+### Klavye Kısayolları
+
+| Kısayol | İşlev |
+| :--- | :--- |
+| `Boşluk` / `X` | Seçili öğeyi inceleme için işaretle veya işareti kaldır |
+| `Del` | Seçili öğeyi doğrudan onayla sil |
+| `Enter` | Klasöre gir / klasörün içine yakınlaş |
+| `Geri tuşu` / `Esc` | Bir üst dizin seviyesine çık |
+| `Alt ←` / `Alt →` | Gezinti geçmişinde geri / ileri git |
+| `Tab` | Bir sonraki en büyük öğeyi seç |
+| `/` | Arama çubuğuna odaklan |
+| `Fare Tekerleği` | Klasörlerde akıcı yakınlaştırma / uzaklaştırma |
+| `C` | İşaretli öğeleri inceleme ve silme ekranını aç |
+| `R` / `F5` | Mevcut dizini yeniden tara |
+| `V` | Bağlı sürücüler ve birimler arasında geçiş yap |
+| `Q` | Uygulamadan çık |
+
+---
+
+# Español
+
+**disktree** es una herramienta moderna y ultrarrápida de visualización y limpieza de espacio en disco desarrollada en **Rust** y **GPUI**. Modela el almacenamiento como un mosaico de mapa de árbol (treemap) interactivo clasificado por tipo de datos, lo que le permite ubicar al instante carpetas pesadas, marcar elementos innecesarios y recuperar espacio en disco con proyecciones de ahorro en tiempo real.
+
+### 🌟 Características destacadas
+- 🔍 **Barra de búsqueda permanente:** Siempre visible en la parte superior. Filtre archivos y carpetas al escribir con botón de reinicio rápido (`✕`).
+- ⬆ **Navegación al directorio superior:** Botón `▲` exclusivo para subir de nivel de carpeta de forma ágil y cómoda.
+- 🗑 **Eliminación directa y segura:** Borrado rápido mediante el panel lateral, menú contextual o tecla `Supr`, con ventana de confirmación inteligente (Papelera de reciclaje o permanente).
+- ⚡ **Rendimiento extraordinario:** Escanea millones de archivos en segundos. En Windows lee directamente la Master File Table (MFT) de NTFS al ejecutarse como administrador.
+- 🎨 **Clasificación visual inteligente:** Código de colores por categorías (código fuente, multimedia, entornos, cachés, repositorios Git, documentos).
+- 🛡️ **Seguridad garantizada:** Protección estricta contra la eliminación de directorios del sistema, perfiles de usuario principales o unidades externas montadas.
+
+### Instalación y puesta en marcha
+
+#### Windows
+Descargue `disktree-*-x86_64-windows.zip`, descomprima el archivo en cualquier ubicación y ejecute `disktree.exe`. ¡Completamente portátil, no requiere instalación!
+- Enlace estático al runtime de C (`+crt-static`) para funcionar en cualquier Windows 10/11 sin necesidad de instalar librerías Visual C++.
+- Ejecútelo como Administrador para activar el escaneo MFT ultrarrápido de discos completos.
+
+#### macOS
+Descargue el archivo `.zip` correspondiente a su arquitectura (Apple Silicon o Intel), descomprímalo y arrastre `disktree.app` a su carpeta Aplicaciones.
+- Si Gatekeeper muestra una advertencia de seguridad al abrir por primera vez, ejecute en la Terminal:
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- Conceda **Acceso total al disco** en *Ajustes del Sistema › Privacidad y seguridad* para permitir el análisis de cachés y datos protegidos.
+
+#### Linux
+Descargue `disktree-*-linux.tar.gz`, descomprímalo y ejecute:
+```sh
+./install.sh
+```
+En Arch Linux puede instalarse directamente desde AUR:
+```sh
+yay -S disktree-bin
+```
+
+### Atajos de teclado
+
+| Atajo | Acción |
+| :--- | :--- |
+| `Espacio` / `X` | Marcar o desmarcar el elemento para revisión |
+| `Supr` (`Del`) | Eliminar el elemento seleccionado (con confirmación) |
+| `Enter` | Entrar al directorio / hacer zoom hacia adentro |
+| `Retroceso` / `Esc` | Subir un nivel de directorio |
+| `Alt ←` / `Alt →` | Historial atrás / adelante |
+| `Tab` | Seleccionar el siguiente elemento más grande |
+| `/` | Enfocar la barra de búsqueda |
+| `Rueda del ratón` | Zoom continuo en el mosaico |
+| `C` | Abrir pantalla de revisión y confirmación de eliminación |
+| `R` / `F5` | Volver a escanear el directorio |
+| `V` | Cambiar entre discos o volúmenes montados |
+| `Q` | Salir de la aplicación |
+
+---
+
+# Русский
+
+**disktree** — это сверхбыстрый и современный визуализатор и инструмент очистки дискового пространства, созданный на **Rust** и **GPUI**. Приложение отображает файловую систему в виде интерактивной древовидной карты (treemap), раскрашенной по типам данных, что позволяет мгновенно находить тяжелые папки, помечать ненужные файлы и безопасно освобождать память с отображением точного прогноза освобождаемого объема.
+
+### 🌟 Ключевые возможности
+- 🔍 **Постоянная строка поиска:** Всегда закреплена в верхней части окна. Мгновенная фильтрация по имени в реальном времени с кнопкой быстрой очистки (`✕`).
+- ⬆ **Кнопка перехода наверх:** Специальная кнопка `▲` для быстрого и удобного перехода в родительский каталог.
+- 🗑 **Прямое и безопасное удаление:** Удаление через боковую панель, контекстное меню или клавишу `Del` с продуманным диалогом подтверждения (Корзина или безвозвратное удаление).
+- ⚡ **Высочайшая скорость работы:** Сканирует миллионы файлов за считанные секунды. В Windows при запуске от имени администратора читает напрямую главную таблицу файлов NTFS (MFT).
+- 🎨 **Интеллектуальная цветовая разметка:** Автоматическое разделение по категориям (исходный код, медиафайлы, сборочные пакеты, кэши, репозитории Git, документы).
+- 🛡️ **Гарантированная защита:** Категорический отказ от удаления системных папок, корней пользовательских профилей и точек монтирования.
+
+### Установка и быстрый старт
+
+#### Windows
+Скачайте архив `disktree-*-x86_64-windows.zip`, распакуйте в любую удобную папку и запустите `disktree.exe`. Установка не требуется (полноценная портативная версия)!
+- Статическая линковка среды выполнения C (`+crt-static`) гарантирует запуск на любой Windows 10/11 без необходимости установки сторонних библиотек DLL.
+- Запустите от имени администратора для активации быстрого сканирования всего диска через MFT.
+
+#### macOS
+Скачайте `.zip` архив для вашей архитектуры (Apple Silicon или Intel), распакуйте и переместите `disktree.app` в папку «Программы».
+- Если при первом запуске Gatekeeper выдает предупреждение, выполните в Терминале:
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- Предоставьте **Полный доступ к диску** в *Системных настройках › Конфиденциальность и безопасность*, чтобы разрешить сканирование кэша и защищенных данных.
+
+#### Linux
+Скачайте `disktree-*-linux.tar.gz`, распакуйте архив и запустите установочный скрипт:
+```sh
+./install.sh
+```
+В Arch Linux доступна установка напрямую из AUR:
+```sh
+yay -S disktree-bin
+```
+
+### Горячие клавиши
+
+| Клавиша | Описание действия |
+| :--- | :--- |
+| `Пробел` / `X` | Отметить или снять отметку с элемента для проверки |
+| `Del` | Удалить выбранный элемент напрямую (с подтверждением) |
+| `Enter` | Войти в папку / приблизить просмотр |
+| `Backspace` / `Esc` | Подняться на один уровень папки вверх |
+| `Alt ←` / `Alt →` | Перемещение по истории назад / вперед |
+| `Tab` | Выбрать следующий наибольший по размеру объект |
+| `/` | Активировать строку поиска |
+| `Колесо мыши` | Плавное масштабирование каталогов |
+| `C` | Открыть экран проверки и подтверждения удаления |
+| `R` / `F5` | Пересканировать текущую папку |
+| `V` | Переключить подключенный диск или раздел |
+| `Q` | Закрыть программу |
+
+---
+
+# Українська
+
+**disktree** — це надзвичайно швидкий та сучасний інструмент для візуалізації й очищення дискового простору, створений на базі **Rust** та **GPUI**. Програма представляє файлову систему у вигляді інтерактивної деревоподібної карти (treemap) з колірним кодуванням за типами даних. Вона дозволяє миттєво виявляти найбільші папки, позначати зайві файли та безпечно звільняти місце з наочним прогнозом повернутого обсягу пам'яті.
+
+### 🌟 Головні переваги
+- 🔍 **Постійний рядок пошуку:** Завжди доступний угорі для миттєвої фільтрації файлів та тек у реальному часі з кнопкою швидкого скасування (`✕`).
+- ⬆ **Перехід на рівень вгору:** Окрема кнопка `▲` для зручного та швидкого підйому до батьківського каталогу.
+- 🗑 **Пряме та безпечне видалення:** Видалення з бічної панелі, контекстного меню або клавішею `Del` із розумним вікном підтвердження (Кошик або остаточне видалення).
+- ⚡ **Колосальна швидкодія:** Сканування мільйонів файлів за лічені секунди. У Windows із правами адміністратора сканує напряму через Master File Table (MFT) файлової системи NTFS.
+- 🎨 **Зрозуміле колірне кодування:** Автоматичне розпізнавання за категоріями (вихідний код, медіа, пакети розробки, системний кеш, репозиторії Git, документи).
+- 🛡️ **Надійний захист:** Сувора заборона видалення критичних системних каталогів, кореневих профілів користувачів та зовнішніх точок монтування.
+
+### Встановлення та швидкий старт
+
+#### Windows
+Завантажте архів `disktree-*-x86_64-windows.zip`, розпакуйте його в будь-яку теку та запустіть `disktree.exe`. Повна портативна версія, встановлення не потрібне!
+- Статичне лінкування бібліотек C (`+crt-static`) забезпечує бездоганну роботу на будь-якій Windows 10/11 без додаткових пакетів розповсюдження.
+- Запуск від імені адміністратора активує надшвидке сканування повного диска через таблицю MFT.
+
+#### macOS
+Завантажте архів `.zip` для вашої платформи (Apple Silicon або Intel), розархівуйте та перетягніть `disktree.app` до теки «Програми».
+- Якщо під час першого запуску Gatekeeper блокує додаток, виконайте в Терміналі:
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/disktree.app
+  ```
+- Надайте **Повний доступ до диска** в меню *Системні параметри › Приватність і безпека* для сканування системних кешів та прихованих файлів.
+
+#### Linux
+Завантажте `disktree-*-linux.tar.gz`, розархівуйте та запустіть інсталяційний скрипт:
+```sh
+./install.sh
+```
+В Arch Linux доступне пряме встановлення з AUR:
+```sh
+yay -S disktree-bin
+```
+
+### Сполучення клавіш
+
+| Клавіша | Дія |
+| :--- | :--- |
+| `Пробіл` / `X` | Позначити або зняти позначку з елемента для перевірки |
+| `Del` | Безпосередньо видалити вибраний елемент (з підтвердженням) |
+| `Enter` | Відкрити каталог / наблизити перегляд теки |
+| `Backspace` / `Esc` | Піднятися на один рівень теки вгору |
+| `Alt ←` / `Alt →` | Навігація історією назад / вперед |
+| `Tab` | Вибрати наступний найбільший за розміром елемент |
+| `/` | Сфокусуватися на рядку пошуку |
+| `Коліщатко миші` | Плавне масштабування вмісту тек |
+| `C` | Відкрити екран перевірки та підтвердження видалення |
+| `R` / `F5` | Повторно просканувати поточний каталог |
+| `V` | Перемкнути змонтований диск або розділ |
+| `Q` | Вийти з програми |
+
+---
+
+## 🛠️ Building from Source / Selbst kompilieren
+
+Prerequisites: **Rust 1.97+**
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/disktree.app
+git clone https://github.com/ing-yaserhasan/disktree.git
+cd disktree-1
+
+# Release Build
+cargo build --release -p disktree-app
+
+# Linux / macOS with Makefile
+make build
+make test
 ```
 
-(Or open it once, then choose **Open Anyway** in System Settings › Privacy &
-Security.)
+---
 
-Or build it, with Rust 1.97 or newer and Xcode or its Command Line Tools.
-macOS does not come with Rust; install it with [rustup](https://rustup.rs).
+## 📄 License / Lizenz
 
-```sh
-make install     # ~/Applications/disktree.app, and ~/.local/bin/disktree
-make uninstall
-```
-
-To see everything, give disktree **Full Disk Access** in System Settings ›
-Privacy & Security (the panel offers a button when it is missing), then
-reopen it. Without it macOS hides Mail, Messages, Safari, other apps' data
-and the Trash, and disktree counts them as unreadable. Started from a
-terminal, it is the terminal that needs the access. macOS also asks once
-each for Desktop, Documents and Downloads.
-
-What is different from Linux:
-
-- **Free space** is what `df` reports. Finder's figure is larger: it counts
-  purgeable space (caches and local snapshots macOS will clear on its own).
-- **Cloned files** (copies APFS shares blocks between, as Finder's Duplicate
-  makes) are each counted in full, so a total can exceed what deleting them
-  frees.
-- **Time Machine's local snapshots** are not files and do not appear; they
-  are part of the gap between the scan and the disk's used space.
-- **Cloud-only folders** (iCloud Drive, Dropbox and the like, evicted to the
-  server) are not opened, so a scan never downloads them.
-
-To sign and notarize a build for others, with a Developer ID certificate in
-the keychain and credentials saved by `xcrun notarytool store-credentials`:
-
-```sh
-NOTARY_PROFILE=<profile> cargo xtask bundle \
-  --sign "Developer ID Application: Name (TEAMID)" --notarize
-```
-
-### Windows
-
-On Windows 10 or 11, download `disktree-*-x86_64-windows.zip`
-(`aarch64-windows` on ARM) from the same release, unpack it anywhere and run
-`disktree.exe`. Or build it with Rust 1.97 or newer, from
-[rustup](https://rustup.rs), and the MSVC toolchain (Visual Studio Build
-Tools, C++ workload):
-
-```powershell
-git clone https://github.com/tobi/disktree
-cd disktree
-cargo build --release    # target\release\disktree.exe
-```
-
-See [On Windows](#on-windows) for what differs there.
-
-## Use
-
-```sh
-disktree            # scan the home directory
-disktree --disk     # the whole disk it lives on
-disktree ~/src      # or any directory
-disktree --help     # options: apparent size, follow links, skip hidden, …
-```
-
-### The screen
-
-- **Top:** the trail from `/`, then what is measured — **Size**, **Files** or
-  **Age**, **Hidden files**, **Apparent size**, and the depth drawn. In the
-  tree a crumb goes there, and its ▾ lists its siblings, largest first with
-  their share and size, to jump sideways (arrows and Enter work too). Above
-  the scanned root a crumb is dimmer, and clicking it widens the scan to
-  there (see below).
-- **Under it:** the scan totals, the filter when one is typed, and the legend.
-- **Mosaic:** colour is the *kind* of data — code, agent scratch,
-  toolchains, synced files, git, media, documents, caches — at one muted
-  level, lighter with depth. A diagonal hatch is space that can be had back
-  (caches, sync history, package stores, build output), independent of
-  colour. Top-level directories carry a strip of their colour and a name
-  band; deeper open directories a slim label row. In **Age** mode colour is
-  the last write instead, from this week to older.
-- **Panel:** the selection (its size set large, share of the scan, files,
-  last write, and for a checkout what git says — changes, stashes, unpushed
-  commits); *Worth a look*, the largest things that could plausibly go;
-  what is marked; and the disk, free now and after the marks, with the way
-  to the review screen. Drag its left edge to resize it; double-click the
-  edge to reset.
-
-One colour is kept apart: amber marks the selection, the main action, and
-what can be had back.
-
-The kinds come from directory names and a few shapes (a bare git repository,
-`target` beside a `Cargo.toml`). Some of the names are specific to one
-machine; see `crates/disktree-core/src/classify.rs`.
-
-### Marking
-
-Space, X, Enter and the arrows act on the tile under the mouse if the mouse
-moved last, and on the keyboard selection after you use an arrow or Tab.
-
-A marked tile takes the danger colour, and so does everything inside it:
-removing a directory takes its contents with it. Marking a directory absorbs
-any marks already inside it, and something inside a marked directory cannot be
-marked or kept on its own; its panel offers to unmark the directory instead.
-Marking is reversible — press it again — and the saving is never counted twice.
-
-### Zooming and going in
-
-Scroll to magnify toward the pointer. The wheel magnifies until the directory
-under the pointer fills the view, and the next notch goes into it — one
-continuous motion, with the directory's contents growing into place. Scroll the
-other way to come back out. Enter goes into the selected directory at any
-depth, and Backspace or Escape goes up one level. `<` and `>`, beside the
-Size / Files / Age switch, go back and forward through the directories visited,
-as do `alt ←` `alt →` (also `⌘[` `⌘]` on macOS) and the mouse's side
-buttons. `+` and `-` magnify without going in; `0` resets.
-
-### Removing
-
-`c` (or **Review…**) opens the list of everything marked. Unmark anything
-there, then choose:
-
-- **Move to trash** — the default when a trash is available. On macOS that is
-  the system Trash, the same move as Finder's (on another disk, that disk's
-  own Trash; network shares often have none). Elsewhere it is `trash-put`
-  from trash-cli, then `gio trash`, then a built-in XDG trash. Recoverable
-  until the trash is emptied, so it commits directly.
-- **Delete permanently** — `rm -rf` semantics. It always asks first, in a dialog
-  that names what goes and how much comes back.
-
-When it finishes, disktree scans again so the numbers on screen match the disk,
-and shows how much free space was actually gained.
-
-## Keys
-
-| key | does |
-| --- | --- |
-| `space` / `x` | mark or unmark the tile you point at |
-| `ctrl`-click (`⌘`-click on macOS) | mark without moving the selection |
-| `enter` | open that directory, at any depth |
-| `⌫` / `esc` | go up one directory |
-| `alt ←` `alt →` | back and forward through where you have been |
-| `←` `↑` `↓` `→` | move between tiles at this level |
-| `tab` | next largest sibling |
-| scroll | zoom toward a directory, then go into it |
-| `shift`-scroll | pan the magnified view |
-| `[` `]` | draw fewer or more levels at once |
-| `-` `=` `0` | magnify, shrink, reset the view |
-| `ctrl =` `ctrl -` `ctrl 0` (`⌘` on macOS) | interface zoom |
-| `/` | filter by name: only matches keep their colour; `enter` shows only them, `esc` clears |
-| `c` | review the marked list |
-| `t` | rank by size or by file count |
-| `d` | disk usage or apparent size |
-| `i` | include or skip hidden entries |
-| `r` | scan again |
-| `esc` while scanning | stop the scan |
-| `v` | scan another mounted volume |
-| `ctrl o` (`⌘O` on macOS) | choose another directory to scan |
-| `g` | the whole disk |
-| `p` | show or hide the selection line |
-| `o` | show it in Finder, File Explorer or the file manager |
-| `?` | every key |
-| `q` | quit |
-
-On macOS the menu bar also has ⌘⇧R to show the selection in Finder, ⌘R to
-rescan, ⌘[ and ⌘] for back and forward, and ⌘Q, ⌘H and ⌘W (closing the
-window quits); other ⌘ chords are left to the system. On Linux and Windows
-the same work with ctrl, with F5 to rescan too.
-
-On the review screen: `m` trash, `p` permanent, `!` unmark all, `enter`
-commits, `esc` goes back. Or hand the list on instead of acting on it: `s`
-saves it as a text file, one path per line, and `a` copies a prompt for a
-coding agent: free the space by removing what you picked, checking each path
-first (git work that exists nowhere else, a tool's own clean command) and
-touching nothing else. A name holding a newline is left out of the list and
-escaped in the prompt, so it cannot pass for another path.
-
-## What it measures
-
-- **Disk usage** by default: `st_blocks × 512`, the number `du` reports and the
-  space that actually comes back when a file is deleted. Apparent size (what
-  `ls -l` shows) is one toggle away.
-- **Hardlinks once.** Two names for one inode cost one file.
-- **Hidden entries included**, because `~/.cache` is often the biggest thing in
-  a home directory. Symlinks are not followed.
-
-The scan follows [dust](https://github.com/bootandy/dust)'s approach: one rayon
-scope per root, a completion counter per directory so no directory is built
-before its last subdirectory lands, and one bottom-up pass that aggregates sizes
-and removes duplicate hardlinks.
-
-## Switching volumes
-
-Press `v` (or click **Volumes** beside the disk name in the side panel) to
-bring up the volume picker. It lists every candidate volume mounted on the
-system together with its free space, ordered fullest first, filtering out
-pseudo-filesystems and duplicate btrfs/APFS mount points. Selecting any
-entry resets the scan root directly to that volume.
-
-## The whole disk
-
-Click `/` (or any directory above the scanned root) in the trail, press
-`g`, run `disktree --disk`, or use the launcher's *Scan the whole disk*
-action. `g` and `--disk` scan the disk your home directory lives on — `/`
-on Omarchy and on macOS. On macOS the Data volume's second mount,
-`/System/Volumes/Data`, is skipped: it is `/Users`, `/Applications` and the
-rest again under other names.
-
-Widening is memoized: the tree already measured is handed to the wider walk
-and reused where it is reached, so going from `~` to `/` reads only what is
-outside `~` (on this machine, seconds instead of a full rescan). The current
-view stays on screen until the wider tree lands, which then opens with the
-directory you came from selected. Going back down is just navigation.
-
-A scan stays on one volume, and a volume is the mount *source*, not the
-device number: btrfs gives each subvolume its own `st_dev`, so `/home`,
-`/var/log` and `/var/cache/pacman/pkg` are included, while `/proc`,
-`/sys`, `/run`, tmpfs, `/boot`, other disks, network shares and automount
-points are left out (checked by path, so an automounted NAS is never
-mounted just to be measured). Snapshot subvolumes are left out too: their
-files share blocks with the live ones, and counting them would count the disk
-twice. `-X` crosses into everything.
-
-Without root, some system directories cannot be read; they are counted as
-unreadable in the top bar rather than guessed at.
-
-## On Windows
-
-The same program, with Windows' answers to the questions above:
-
-- **Disk usage** is the allocation NTFS reports for each file: whole
-  clusters, less for a compressed or sparse file, nothing for one small
-  enough to live in its file record. It arrives with the directory listing
-  itself (`FileIdExtdDirectoryInfo`), so it costs no more than the walk.
-  Hardlinks count once on NTFS.
-- **The whole disk** is the drive your profile is on, usually `C:\`. A
-  folder another volume is mounted on is a link, like a junction, and is
-  not entered, so a scan stays on one volume; `-l` follows links, and with
-  them mounted folders.
-- **Run as administrator** and the whole disk is read from NTFS's master
-  file table instead of walked, as WizTree does: one pass over the table in
-  large reads. On a 4-million-file `C:\` that took about 3.4 s against 11.2
-  s for WizTree and about 20 s for the walk. It also sees what the walk is
-  refused, such as System Volume Information. It is used only for a whole
-  NTFS drive, since a folder would still cost the whole table, and not with
-  `-l`, whose links the table does not follow. disktree flushes the volume
-  after its own removals so the rescan shows them; changes other programs
-  made seconds before may not show yet.
-  Started without admin rights, disktree walks as before. On a whole NTFS
-  drive without `-l`, or once Windows refuses the walk a folder, the side
-  panel offers **Restart as Administrator**, which reopens the same folder
-  and options through the UAC prompt; during a widening scan, the wider
-  folder being scanned.
-- **Move to trash** is the Recycle Bin, through the shell, which asks
-  before destroying anything it cannot recycle.
-- **Refused besides the rules below:** Windows, Program Files and
-  ProgramData, what Windows keeps at the top of its drive (System Volume
-  Information, Recovery, Boot, and the page and hibernation files, which
-  Settings turns off), any folder holding your profile, such as
-  `C:\Users`, and every profile in the folder Windows keeps them in
-  (`C:\Users\*`, `Public` and `Default` included), since an elevated
-  disktree may run as another account and can reach them all. What is
-  inside a profile can still be removed, as under your own. Names compare
-  without regard to case, as Windows compares them.
-- **Hidden** means a name starting with a dot, or the hidden attribute, so
-  `-H` drops `AppData` as Explorer hides it.
-- **The theme** follows Windows' light or dark setting, since there is no
-  Omarchy theme to follow. It does on macOS too, and on GNOME and KDE.
-
-## What it refuses to do
-
-The removal rules live in `crates/disktree-core/src/removal.rs`, and each one is
-tested:
-
-- only paths under the scanned root can be removed;
-- the filesystem root, the scanned root and your home directory are refused;
-- a mount point is refused, and so is anything with a mount point inside it,
-  since removing it would reach into another filesystem; permanent deletion
-  also stops at a mount boundary rather than descending into one (a btrfs
-  subvolume that is not mounted goes with its directory, as the scan shows
-  it);
-- a directory holding your home directory or a system tree is refused (on
-  macOS `/Users` is on the same volume as `/`, and `/opt` holds
-  `/opt/homebrew`);
-- system trees (`/usr`, `/etc`, `/boot`, `/var/lib`, `/nix/store`,
-  `/gnu/store`, Homebrew's prefix on macOS and Linux, …) are
-  refused even where permissions would allow it: packages own them, and
-  pacman, paccache or `journalctl --vacuum` are the tools;
-- a symlink is unlinked, never followed;
-- nothing is passed through a shell — a file called `-rf` is just a file;
-- selecting a checkout never runs a program it names: git is asked with its
-  fsmonitor, hooks and pager off, and a checkout that defines its own filter
-  drivers is not asked for its status at all ("changes unknown").
-
-## On Hyprland
-
-Hyprland tiles new windows, so disktree opens into whatever tile it is given.
-It is designed for a roomy window; float it, or give it a rule. The window
-class is `disktree`.
-
-```
-windowrule = float, class:^(disktree)$
-windowrule = size 1400 900, class:^(disktree)$
-```
-
-## Develop
-
-```sh
-make run      # release build, scanning $HOME
-make lint     # rustfmt --check, then clippy with every warning an error
-make test     # scanner, layout and removal tests, plus window-harness tests
-make ci       # lint, then test
-```
-
-The lint gate is strict on purpose: `clippy::all` and `clippy::pedantic` are
-errors, and every exception is written down with its reason in `Cargo.toml`.
-The window-harness tests draw real frames and press real keys — including one
-that marks a directory, confirms the deletion and checks that the files are
-gone while their neighbours are not.
-
-| path | what lives there |
-| --- | --- |
-| `crates/disktree-core` | scanning, the tree, the squarified layout, free space and removal — no UI |
-| `crates/disktree-app/src/state.rs` | every action the interface can take, and the key map |
-| `crates/disktree-app/src/views.rs` | the screens |
-| `crates/disktree-app/src/treemap_view.rs` | painting the mosaic and its labels |
-| `crates/disktree-app/src/ui.rs` | the spacing, type and size scale, in `rem` |
-| `crates/disktree-app/src/tests.rs` | end-to-end tests through a real window |
-| `packaging/`, `assets/`, `Makefile` | the desktop entry, the icon, and install |
-
-The interface follows the
-[GPUI Kit design guides](https://gpui-kit.com/versions/main/docs/design-guides/):
-every size is on one `rem` scale so interface zoom keeps its proportions,
-primary is reserved for what Enter does, and the only question the app asks is
-the one it cannot take back.
-
-## License
-
-MIT
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.

@@ -12,12 +12,13 @@
 use std::rc::Rc;
 
 use disktree_core::treemap::Rect;
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, Bounds, ContentMask, Context, Corners, Edges, Font, FontWeight, Hsla,
-    InteractiveElement as _, IntoElement, MouseDownEvent, MouseMoveEvent,
-    ParentElement as _, Pixels, Point, ScrollWheelEvent, SharedString, Size,
-    StatefulInteractiveElement as _, Styled, TextAlign, TextRun, Window,
-    canvas, div, pattern_slash, px, quad,
+    InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point,
+    ScrollWheelEvent, SharedString, Size, StatefulInteractiveElement as _,
+    Styled, TextAlign, TextRun, Window, canvas, div, pattern_slash, px, quad,
 };
 use gpui_omarchy::{ActiveTheme, Theme};
 
@@ -108,6 +109,23 @@ pub fn mosaic(
         .on_any_mouse_down(cx.listener(|this, event: &MouseDownEvent, _, cx| {
             this.on_mouse_down(event, cx);
         }))
+        .on_mouse_up(
+            MouseButton::Left,
+            cx.listener(|this, event: &MouseUpEvent, _, cx| {
+                this.on_mouse_up(event, cx);
+            }),
+        )
+        .on_mouse_up(
+            MouseButton::Middle,
+            cx.listener(|this, event: &MouseUpEvent, _, cx| {
+                this.on_mouse_up(event, cx);
+            }),
+        )
+        .when(app.is_panning(), gpui_kit::Styled::cursor_grabbing)
+        .when(
+            !app.is_panning() && app.view.scale > 1.0,
+            gpui_kit::Styled::cursor_grab,
+        )
         .on_scroll_wheel(cx.listener(
             |this, event: &ScrollWheelEvent, _, cx| {
                 this.on_scroll_wheel(event, cx);
@@ -439,8 +457,9 @@ fn paint_labels(
             FontWeight::NORMAL
         };
 
+        let display_text = crate::bidi::fix_rtl(&label.text);
         let run = TextRun {
-            len: label.text.len(),
+            len: display_text.len(),
             font: Font {
                 weight,
                 ..font.clone()
@@ -449,7 +468,7 @@ fn paint_labels(
             ..TextRun::default()
         };
         let line = text_system.shape_line(
-            SharedString::from(label.text.clone()),
+            SharedString::from(display_text.into_owned()),
             name_size,
             &[run],
             None,
